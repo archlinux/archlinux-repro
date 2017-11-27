@@ -10,6 +10,33 @@ exec_nspawn(){
     systemd-nspawn -q --as-pid2 -D "$build_directory/$container" "${@:2}"
 }
 
+build_package(){
+    local build=$1
+    exec_nspawn root pacman -Syu --noconfirm
+    echo "Create snapshot for $build..."
+    btrfs subvolume snapshot "$build_directory/root" "$build_directory/$build"
+    touch "$build_directory/$build"
+    exec_nspawn $build \
+        --bind="$PWD:/startdir" \
+        --bind="$PWD:/srcdest" \
+bash <<-__END__
+set -e
+mkdir -p /pkgdest
+chown build:build /pkgdest
+mkdir -p /srcpkgdest
+chown build:build /srcpkgdest
+cd /startdir
+sudo -u build SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg --syncdeps --noconfirm --skipinteg || true
+__END__
+
+    for pkgfile in "$build_directory/$build"/pkgdest/*; do
+        mv "$pkgfile" "$build".tar.xz
+    done
+
+    echo "Delete snapshot for $build..."
+    btrfs subvolume delete "$build_directory/$build"
+}
+
 set -e
 
 if [ ! -f "$bootstrap_img" ]; then
@@ -67,54 +94,12 @@ SOURCE_DATE_EPOCH=$(date +%s)
 echo "Using SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
 
 # Build 1
-exec_nspawn root pacman -Syu --noconfirm
-echo "Create snapshot for build1..."
-btrfs subvolume snapshot "$build_directory/root" "$build_directory/build1"
-touch "$build_directory/build1"
-exec_nspawn build1 \
-    --bind="$PWD:/startdir" \
-    --bind="$PWD:/srcdest" \
-    bash <<-__END__
-set -e
-mkdir -p /pkgdest
-chown build:build /pkgdest
-mkdir -p /srcpkgdest
-chown build:build /srcpkgdest
-cd /startdir
-sudo -u build SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg --syncdeps --noconfirm --skipinteg || true
-__END__
 
-for pkgfile in "$build_directory"/build1/pkgdest/*; do
-    mv "$pkgfile" build1.tar.xz
-done
-
-echo "Delete snapshot for build1..."
-btrfs subvolume delete "$build_directory/build1"
+build_package "build1"
 
 #### Build 2
 
-echo "Create snapshot for build2..."
-btrfs subvolume snapshot "$build_directory/root" "$build_directory/build2"
-touch "$build_directory/build2"
-exec_nspawn build2 \
-    --bind="$PWD:/startdir" \
-    --bind="$PWD:/srcdest" \
-    bash <<-__END__
-set -e
-mkdir -p /pkgdest
-chown build:build /pkgdest
-mkdir -p /srcpkgdest
-chown build:build /srcpkgdest
-cd /startdir
-sudo -u build SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg --syncdeps --noconfirm --skipinteg || true
-__END__
-
-for pkgfile in "$build_directory"/build2/pkgdest/*; do
-    mv "$pkgfile" build2.tar.xz
-done
-
-echo "Delete snapshot for build2..."
-btrfs subvolume delete "$build_directory/build2"
+build_package "build2"
 
 sha512sum -b build1.tar.xz | read build1_checksum _
 sha512sum -b build2.tar.xz | read build2_checksum _
