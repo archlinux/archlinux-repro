@@ -116,5 +116,10 @@ done
 echo "Delete snapshot for build2..."
 btrfs subvolume delete "$build_directory/build2"
 
-sha256sum -b build1.tar.xz
-sha256sum -b build2.tar.xz
+sha512sum -b build1.tar.xz | read build1_checksum _
+sha512sum -b build2.tar.xz | read build2_checksum _
+if [ "$build1_checksum" = "$build2_checksum" ]; then
+  echo "Reproducible package!"
+else
+  echo "Not reproducible!"
+fi
