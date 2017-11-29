@@ -100,9 +100,9 @@ chown build:build /srcpkgdest
 cd /startdir
 sudo -u build SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg --syncdeps --noconfirm --skipinteg || true
 __END__
-
+    mkdir -p "./$build" || true
     for pkgfile in "$build_directory/$build"/pkgdest/*; do
-        mv "$pkgfile" "$build".tar.xz
+        mv "$pkgfile" "./$build/"
     done
 }
 
@@ -172,10 +172,21 @@ create_snapshot "build2"
 build_package "build2"
 remove_snapshot "build2"
 
-sha512sum -b build1.tar.xz | read build1_checksum _
-sha512sum -b build2.tar.xz | read build2_checksum _
-if [ "$build1_checksum" = "$build2_checksum" ]; then
-  echo "Reproducible package!"
+msg "Comparing hashes..."
+is_error=false
+for pkgfile in ./build1/*; do
+    sha512sum -b $pkgfile | read build1_checksum _
+    sha512sum -b $pkgfile | read build2_checksum _
+    if [ "$build1_checksum" = "$build2_checksum" ]; then
+      msg2 "${pkgfile##*/} is reproducible!"
+    else
+      warning "${pkgfile##*/} is not reproducible!"
+      is_error=true
+    fi
+done
+
+if $is_error; then
+    error "Package is not reproducible"
 else
-  echo "Not reproducible!"
+    msg "Package is reproducible!"
 fi
