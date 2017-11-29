@@ -48,6 +48,18 @@ error() {
 	printf "${RED}==> $(gettext "ERROR:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
+
+cleanup_root_volume(){
+    warning "removing root container..."
+    btrfs subvolume delete "$build_directory/root" > /dev/null
+}
+
+cleanup_snapshot(){
+    local build=$1
+    warning "removing $build container..."
+    btrfs subvolume delete "$build_directory/$build" > /dev/null || true
+}
+
 readonly build_directory=/var/lib/repro
 readonly config_dir=/home/fox/Git/prosjekter/Bash/devtools-repro
 readonly bootstrap_mirror=https://mirror.archlinux.no/iso/latest
@@ -58,12 +70,24 @@ exec_nspawn(){
     systemd-nspawn -q --as-pid2 -D "$build_directory/$container" "${@:2}"
 }
 
-build_package(){
+# $1 -> name of container
+create_snapshot (){
     local build=$1
     exec_nspawn root pacman -Syu --noconfirm
-    echo "Create snapshot for $build..."
-    btrfs subvolume snapshot "$build_directory/root" "$build_directory/$build"
+    msg "Create snapshot for $build..."
+    btrfs subvolume snapshot "$build_directory/root" "$build_directory/$build" &> /dev/null
     touch "$build_directory/$build"
+}
+
+# $1 -> name of container
+remove_snapshot (){
+    local build=$1
+    msg "Delete snapshot for $build..."
+    btrfs subvolume delete "$build_directory/$build" &> /dev/null
+}
+
+build_package(){
+    local build=$1
     exec_nspawn $build \
         --bind="$PWD:/startdir" \
         --bind="$PWD:/srcdest" \
@@ -80,9 +104,6 @@ __END__
     for pkgfile in "$build_directory/$build"/pkgdest/*; do
         mv "$pkgfile" "$build".tar.xz
     done
-
-    echo "Delete snapshot for $build..."
-    btrfs subvolume delete "$build_directory/$build"
 }
 
 set -e
@@ -145,11 +166,17 @@ echo "Using SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
 
 # Build 1
 
+# Build 1
+msg2 "Starting build1..."
+create_snapshot "build1"
 build_package "build1"
+remove_snapshot "build1"
 
-#### Build 2
-
+# Build 2
+msg2 "Starting build2..."
+create_snapshot "build2"
 build_package "build2"
+remove_snapshot "build2"
 
 sha512sum -b build1.tar.xz | read build1_checksum _
 sha512sum -b build2.tar.xz | read build2_checksum _
