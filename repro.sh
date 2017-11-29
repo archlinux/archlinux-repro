@@ -136,7 +136,7 @@ if [ ! -d "$build_directory"/root ]; then
     cp $config_dir/pacman.conf "$build_directory"/root/etc/pacman.conf
 
     systemd-machine-id-setup --root="$build_directory"/root
-    echo "Setting up keyring..."
+    msg2 "Setting up keyring, this might take a while..."
     # exec_nspawn root pacman-key --init #&> /dev/null
     # exec_nspawn root pacman-key --populate archlinux #&> /dev/null
     # exec_nspawn root pacman-key --refresh #&> /dev/bull
@@ -156,9 +156,9 @@ if [ ! -d "$build_directory"/root ]; then
 fi
 
 SOURCE_DATE_EPOCH=$(date +%s)
-echo "Using SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
+msg "Using SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
 
-# Build 1
+# trap '{ cleanup_snapshot; exit 1; }' ERR
 
 # Build 1
 msg2 "Starting build1..."
