@@ -87,8 +87,8 @@ __END__
 
 set -e
 
-if [ ! -f "$bootstrap_img" ]; then
-    curl -O "$bootstrap_mirror/$bootstrap_img"
+if [ ! -f "$build_directory/$bootstrap_img" ]; then
+    curl -o  "$build_directory/$bootstrap_img" "$bootstrap_mirror/$bootstrap_img"
 fi
 
 if [ ! -d "$build_directory" ]; then
@@ -97,9 +97,11 @@ fi
 
 # Prepare root chroot
 if [ ! -d "$build_directory"/root ]; then
-    echo "Extracting image into container..."
-    btrfs subvolume create "$build_directory/root"
-    tar xvf "$bootstrap_img" -C "$build_directory/root" --strip-components=1 &> /dev/null
+    trap '{ cleanup_root_volume; exit 1; }' ERR
+    msg "Preparing chroot"
+    msg2 "Extracting image into container..."
+    btrfs subvolume create "$build_directory/root" > /dev/null
+    tar xvf "$build_directory/$bootstrap_img" -C "$build_directory/root" --strip-components=1 > /dev/null
 
     # host_mirror=$(curl -s 'https://www.archlinux.org/mirrorlist/?protocol=https' | awk '/^#Server/ {print $3; exit}')
     ## Hardcoded until further notice
