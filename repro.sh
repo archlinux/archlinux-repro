@@ -141,22 +141,16 @@ if [ ! -d "$build_directory"/root ]; then
     # exec_nspawn root pacman-key --populate archlinux #&> /dev/null
     # exec_nspawn root pacman-key --refresh #&> /dev/bull
     
-    echo "Updating and installing base & base-devel"
-    exec_nspawn root pacman -Syu --noconfirm --ignore linux
-    exec_nspawn root pacman -S base base-devel --noconfirm
+    msg2 "Updating and installing base & base-devel"
+    exec_nspawn root pacman -Syu --noconfirm --ignore linux --ignore pacman-git
+    exec_nspawn root pacman -S base base-devel --noconfirm --ignore pacman-git
     exec_nspawn root locale-gen
 
     printf 'build ALL = NOPASSWD: /usr/bin/pacman\n' > "$build_directory"/root/etc/sudoers.d/build-pacman
     exec_nspawn root useradd -m -G wheel -s /bin/bash build
 
-    echo "Installing pacman-git"
-    mkdir -p "$build_directory"/root/home/build/pacman
-
-    curl -o "$build_directory"/root/home/build/pacman/PKGBUILD https://raw.githubusercontent.com/Earnestly/pkgbuilds/master/pacman-git/PKGBUILD
-
-    exec_nspawn root chown -R build:build /home/build/pacman
-    exec_nspawn root sudo -iu build bash -c 'cd pacman && makepkg --noconfirm -csrf'
-    exec_nspawn root bash -c "yes | pacman -U /home/build/pacman/pacman-git*"
+    msg2 "Installing pacman-git"
+    exec_nspawn root bash -c "yes | pacman -S pacman-git"
     cp $config_dir/makepkg.conf "$build_directory"/root/etc/makepkg.conf
     cp $config_dir/pacman.conf "$build_directory"/root/etc/pacman.conf
 fi
