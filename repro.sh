@@ -66,9 +66,9 @@ if [ ! -d "$build_directory"/root ]; then
 
     systemd-machine-id-setup --root="$build_directory"/root
     echo "Setting up keyring..."
-    exec_nspawn root pacman-key --init &> /dev/null
-    exec_nspawn root pacman-key --populate archlinux &> /dev/null
-    exec_nspawn root pacman-key --refresh &> /dev/bull
+    # exec_nspawn root pacman-key --init #&> /dev/null
+    # exec_nspawn root pacman-key --populate archlinux #&> /dev/null
+    # exec_nspawn root pacman-key --refresh #&> /dev/bull
     
     echo "Updating and installing base & base-devel"
     exec_nspawn root pacman -Syu --noconfirm --ignore linux
