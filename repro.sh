@@ -218,14 +218,6 @@ cmd_build(){
 
     check_root
 
-    while getopts :C:M:R arg; do
-        case $arg in
-            C) pacman_conf=$OPTARG;;
-            M) makepkg_conf=$OPTARG;;
-            *);;
-        esac
-    done
-
     SOURCE_DATE_EPOCH=$(date +%s)
     msg "Using SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
 
@@ -270,22 +262,40 @@ cmd_check(){
 }
 
 cmd_help(){
-    echo "Help string"
+cat <<__END__
+Usage:   
+  repro <command> [options]
+
+Commands:
+  check                       Recreate a package file
+  build                       Build a package and test for reproducability 
+  help                        This help message
+
+General Options:
+ -R                           Force the rsync subcontainer creation
+ -C                           Specify pacman.conf to build with
+ -M                           Specify makepkg.conf to build with
+__END__
+}
+
+args(){
+    while getopts :R arg; do
+        case $arg in
+            R) use_rsync=true;;
+            C) pacman_conf=$OPTARG;;
+            M) makepkg_conf=$OPTARG;;
+            *);;
+        esac
+    done
 }
 
 if [ ! -d "/tmp/arch_img" ]; then
     curl -o  "$img_directory/$bootstrap_img" "$bootstrap_mirror/$bootstrap_img"
 fi
 
-while getopts :R arg; do
-    case $arg in
-        R) use_rsync=true;;
-        *);;
-    esac
-done
-
 case "$1" in
-    help) shift; cmd_help "$@" ;;
-    check) shift; init_chroot; cmd_check "$@" ;;
-    *) init_chroot; cmd_build "$@" ;;
+    help) cmd_help "$@" ;;
+    check) shift; args "$@"; init_chroot; cmd_check "$@" ;;
+    build) shift; args "$@"; init_chroot; cmd_build "$@" ;;
+    *) args "$@"; init_chroot; cmd_build "$@" ;;
 esac
