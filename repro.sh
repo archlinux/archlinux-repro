@@ -15,7 +15,7 @@ makepkg_conf=$config_dir/makepkg.conf
 
 # img_directory=$(mktemp -dt .arch_img)
 img_directory="/tmp/arch_img"
-mkdir -p /tmp/arch_img
+mkdir -p $img_directory
 
 
 
@@ -289,7 +289,7 @@ args(){
     done
 }
 
-if [ ! -d "/tmp/arch_img" ]; then
+if [ ! -d "$img_directory" ]; then
     curl -o  "$img_directory/$bootstrap_img" "$bootstrap_mirror/$bootstrap_img"
 fi
 
