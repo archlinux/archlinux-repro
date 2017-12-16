@@ -289,7 +289,7 @@ args(){
     done
 }
 
-if [ ! -d "$img_directory" ]; then
+if [ ! -e "$img_directory/$bootstrap_img" ]; then
     curl -o  "$img_directory/$bootstrap_img" "$bootstrap_mirror/$bootstrap_img"
 fi
 
