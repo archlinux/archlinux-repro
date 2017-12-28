@@ -10,6 +10,8 @@ readonly bootstrap_img=archlinux-bootstrap-"$(date +%Y.%m)".01-"$(uname -m)".tar
 
 readonly config_dir=/home/fox/Git/prosjekter/Bash/devtools-repro
 
+# Default options
+use_rsync=false
 pacman_conf=$config_dir/pacman.conf
 makepkg_conf=$config_dir/makepkg.conf
 
@@ -118,7 +120,7 @@ create_snapshot (){
     trap '{ remove_snapshot $build ; trap - INT; kill -INT $$; }' INT
 
     msg2 "Create snapshot for $build..."
-    if [ ! -z ${use_rsync+x} ] || ! is_btrfs "$build_directory/root"; then 
+    if $use_rsync || ! is_btrfs "$build_directory/root"; then 
         msg2 "Creating rsync snapshot"
         mkdir -p "$build_directory/$build"
 		rsync -a --delete -W -x "$build_directory/root/" "$build_directory/$build"
@@ -171,11 +173,13 @@ init_chroot(){
         trap '{ cleanup_root_volume; trap - INT; kill -INT $$; }' INT
 
         msg2 "Extracting image into container..."
-        mkdir -p $build_directory/root
+        # mkdir -p $build_directory/root
         # Turn into a subvolume if there is btrfs present
-        if [ -z ${use_rsync+x} ] || ! is_btrfs "$build_directory"; then 
-            msg "Creating btrfs snapshot"
+        if ! $use_rsync && is_btrfs "$build_directory"; then 
+            msg "Creating btrfs root container"
             btrfs subvolume create "$build_directory/root" > /dev/null
+        else
+            mkdir -p $build_directory/root
         fi
         tar xvf "$img_directory/$bootstrap_img" -C "$build_directory/root" --strip-components=1 > /dev/null
 
