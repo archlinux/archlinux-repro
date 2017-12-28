@@ -128,7 +128,9 @@ create_snapshot (){
         msg2 "Creating btrfs snapshot"
         if ! btrfs subvolume snapshot "$build_directory/root" "$build_directory/$build" &> /dev/null; then
             error "Couldn't create snapshot, did you forget -R?"
-            remove_snapshot $build && exit 1
+            remove_snapshot $build
+            use_rsync=true
+            create_snapshot $build
         fi
     fi
 
