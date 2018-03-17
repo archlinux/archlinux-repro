@@ -1,6 +1,6 @@
 # Maintainer: Morten Linderud <foxboron@archlinux.org>
 pkgname=devtools-repro-git
-pkgver=r25.51da7bb
+pkgver=r28.f9ac7ea
 pkgrel=1
 pkgdesc='helper tools for the arch user repository'
 url='https://github.com/Foxboron/devtools-repro'
@@ -10,8 +10,8 @@ source=('git+https://github.com/Foxboron/devtools-repro')
 sha256sums=('SKIP')
 conflicts=('devtools-repro')
 provides=('devtools-repro')
-depends=('bash')
-makedepends=('git')
+depends=('gnupg' 'curl')
+makedepends=('git' 'asciidoc')
 
 pkgver() {
     cd devtools-repro

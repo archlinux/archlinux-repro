@@ -6,11 +6,11 @@ LIBDIR ?= $(PREFIX)/lib
 DOCSDIR ?= $(SHRDIR)/doc
 CONFDIR ?= /etc
 
-.PHONY: install
+all: man repro
+man: docs/repro.8 docs/repro.conf.5
 
-man: 
-	a2x --no-xmllint -d manpage -f manpage -D docs docs/repro.8.txt
-	a2x --no-xmllint -d manpage -f manpage -D docs docs/repro.conf.5.txt
+repro.%:
+	a2x --no-xmllint -d manpage -f manpage -D docs $@.txt
 
 repro: repro.in
 	m4 -DREPRO_CONFIG_DIR=$(CONFDIR)/$(PROGNM) $< >$@
