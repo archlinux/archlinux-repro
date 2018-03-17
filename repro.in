@@ -8,7 +8,7 @@ readonly build_directory=/var/lib/repro
 readonly bootstrap_mirror=https://mirror.archlinux.no/iso/latest
 readonly bootstrap_img=archlinux-bootstrap-"$(date +%Y.%m)".01-"$(uname -m)".tar.gz
 
-readonly config_dir=/home/fox/Git/prosjekter/Bash/devtools-repro
+readonly config_dir='REPRO_LIB_DIR'
 
 # Default options
 pacman_conf=$config_dir/pacman.conf
