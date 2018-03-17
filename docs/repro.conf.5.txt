@@ -1,0 +1,47 @@
+repro.conf(5)
+=============
+
+Name
+----
+repro.conf - repro configuration file
+
+
+Synopsis
+--------
+/etc/devtools-repro/repro.conf, $XDG_CONFIG_HOME/devtools-repro/repro.conf, ~/.repro.conf
+
+
+Description
+-----------
+Configuration options for repro are stored in repro.conf. This file is sourced
+by repro on launch. All the variables, regardless of being described below, are
+exported to the build environment.
+
+The system-wide configuration file is found in /etc/devtools-repro/repro.conf.
+Induvidual options can be override on a per-user basis in
+$XDG_CONFIG_HOME/devtools-repro/repro.conf or ~/.repro.conf, with the former
+taking priority.
+
+
+Options
+-------
+**CONFIGDIR=**"/etc/devtools-repro/repro"::
+        Location of the location of makepkg.conf and pacman.conf used for the
+        container.
+
+**BOOTSTRAPMIRROR=**"https://mirror.archlinux.no/iso/latest"::
+        Download location of the bootstrap image used for creating the container. 
+
+**HOSTMIRROR=**"http://mirror.neuf.no/archlinux/\$repo/os/\$arch"::
+        The mirror used inside the container by pacman.
+
+**BUILDDIRECTORY=**"/var/lib/repro"::
+        Location where the containers should be stored.
+
+**IMGDIRECTORY=**"/tmp/arch_img"::
+        Location where the Arch Linux bootstrap image should be downloaded to.
+
+
+See Also
+--------
+linkman:repro[8], linkman:makepkg.conf[5], linkman:pacman.conf[5]

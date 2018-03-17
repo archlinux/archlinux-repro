@@ -1,5 +1,5 @@
 # Location of makepkg.conf and pacman.conf
-CONFIGDIR="/var/lib/repro"
+CONFIGDIR="/etc/devtools-repro"
 
 # URL for where to grab bootstrap images
 BOOTSTRAPMIRROR="https://mirror.archlinux.no/iso/latest"

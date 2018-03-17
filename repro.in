@@ -258,7 +258,8 @@ Commands:
   help                        This help message
 
 General Options:
- -C                           Specify pacman.conf to build with
+ -C                           Specify repro.conf to build with
+ -P                           Specify pacman.conf to build with
  -M                           Specify makepkg.conf to build with
 __END__
 }
@@ -266,7 +267,8 @@ __END__
 args(){
     while getopts :R arg; do
         case $arg in
-            C) pacman_conf=$OPTARG;;
+            C) REPRO_CONF=$OPTARG;;
+            P) pacman_conf=$OPTARG;;
             M) makepkg_conf=$OPTARG;;
             *);;
         esac
@@ -274,15 +276,18 @@ args(){
 }
 
 
-if [[ -r "$CONFIGDIR/repro.conf" ]]; then
-    source "$CONFIGDIR/repro.conf"
+REPRO_CONF=${REPRO_CONF:-$CONFIGDIR/repro.conf}
+if [[ -r $REPRO_CONF ]]; then
+    source $REPRO_CONF 
 fi
 
 XDG_REPRO_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/repro"
-if [[ -r "$XDG_REPRO_DIR/repro.conf" ]]; then
-    source "$XDG_REPRO_DIR/repro.conf"
-elif [[ -r "$HOME/.repro.conf" ]]; then
-    source "$HOME/.repro.conf"
+if [[ "$REPO_CONF" = "$CONFIGDIR/repro.conf" ]]; then
+    if [[ -r "$XDG_REPRO_DIR/repro.conf" ]]; then
+        source "$XDG_REPRO_DIR/repro.conf"
+    elif [[ -r "$HOME/.repro.conf" ]]; then
+        source "$HOME/.repro.conf"
+    fi
 fi
 
 

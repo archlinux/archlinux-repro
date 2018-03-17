@@ -8,11 +8,17 @@ CONFDIR ?= /etc
 
 .PHONY: install
 
+man: 
+	a2x --no-xmllint -d manpage -f manpage -D docs docs/repro.8.txt
+	a2x --no-xmllint -d manpage -f manpage -D docs docs/repro.conf.5.txt
+
 repro: repro.in
 	m4 -DREPRO_CONFIG_DIR=$(CONFDIR)/$(PROGNM) $< >$@
 
-install: repro
+install: repro man
 	@install -Dm755 repro	-t $(DESTDIR)$(BINDIR)
 	@install -Dm644 conf/*   -t $(DESTDIR)$(CONFDIR)/$(PROGNM)
-	@install -Dm644 docs/*   -t $(DESTDIR)$(DOCSDIR)/$(PROGNM)
+	@install -Dm644 examples/*   -t $(DESTDIR)$(SHRDIR)/$(PROGNM)
+	@install -Dm644 docs/repro.8   -t $(DESTDIR)$(SHRDIR)/man/man8
+	@install -Dm644 docs/repro.conf.5   -t $(DESTDIR)$(SHRDIR)/man/man5
 	@install -Dm644 LICENSE -t $(DESTDIR)$(SHRDIR)/licenses/$(PROGNM)

@@ -1,0 +1,62 @@
+repro(8)
+========
+
+Name
+----
+repro - reproducible builds utility
+
+
+Synopsis
+--------
+'repro' <command> [options]
+
+
+Description
+-----------
+'repro' is a script to help with verifying and checking reproducibility of
+packages. It builds a linkman:systemd-nspawn[1] container with the Arch Linux
+bootstrap image to build packages in a clean chroot. It has two modes of
+operation, 'build' and 'check'.
+
+'build' assumed a linkman:PKGBUILD[5] in the current directory and attempts to
+build this twice and compares the resulting checksums. The builds will provide
+different environments where we mix up timezones, locale and filesystem order to
+properly find flaws with the package.
+
+'check' takes a package as an argument and attempts to recreate the package with
+the information provided with linkman:BUILDINFO[5]. It will use the Arch Linux
+archive to fetch packages with the correct pkgver.
+
+
+Commands
+--------
+**build**::
+        Builds a package twice and compares sha512 checksums to check for
+        reproducability issues. This assumes the current directory contains a
+        PKGBUILD. See linkman:PKGBUILD[5] (This is the default command)   
+
+**check** <package>::
+        TBA
+    
+
+Options
+-------
+*-C*::
+        Specify a linkman:repro.conf[5] file to use for the build container.
+
+*-P*::
+        Specify a linkman:pacman.conf[5] file to use for the build container.
+
+*-M*::
+        Specify a linkman:makepkg.conf[5] file to use for the build container.
+
+
+Configuration
+-------------
+See linkman:repro.conf[5] for more details on configuring repro using the
+'repro.conf' file.
+
+
+See Also
+--------
+linkman:makepkg[8], linkman:repro.conf[5], linkman:pacman.conf[5], linkman:makepkg.conf[5]
