@@ -20,8 +20,8 @@ img_directory="/tmp/arch_img"
 mkdir -p $img_directory
 
 
-
 orig_argv=("$0" "$@")
+src_owner=${SUDO_USER:-$USER}
 check_root() {
 	(( EUID == 0 )) && return
 	if type -P sudo >/dev/null; then
@@ -156,6 +156,7 @@ __END__
     for pkgfile in "$build_directory/$build"/pkgdest/*; do
         mv "$pkgfile" "./$build/"
     done
+    chown -R "$src_owner" "./$build"
 }
 
 init_chroot(){
