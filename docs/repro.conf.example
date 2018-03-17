@@ -1,0 +1,14 @@
+# Location of makepkg.conf and pacman.conf
+CONFIGDIR="/var/lib/repro"
+
+# URL for where to grab bootstrap images
+BOOTSTRAPMIRROR="https://mirror.archlinux.no/iso/latest"
+
+# Mirror inserted into the container mirrorlist
+HOSTMIRROR="http://mirror.neuf.no/archlinux/\$repo/os/\$arch"
+
+# Where contains should be kept
+BUILDDIRECTORY="/var/lib/repo"
+
+# Where to store bootstrap images
+IMGDIRECTORY="/tmp/arch_img"

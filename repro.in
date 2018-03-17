@@ -4,19 +4,23 @@
 
 set -eE -o pipefail
 
-readonly build_directory=/var/lib/repro
-readonly bootstrap_mirror=https://mirror.archlinux.no/iso/latest
+BUILDDIRECTORY=/var/lib/repro
+BOOTSTRAPMIRROR=https://mirror.archlinux.no/iso/latest
 readonly bootstrap_img=archlinux-bootstrap-"$(date +%Y.%m)".01-"$(uname -m)".tar.gz
 
-readonly config_dir='REPRO_LIB_DIR'
+CONFIGDIR='REPRO_CONFIG_DIR'
+
+# HOSTMIRROR=$(curl -s 'https://www.archlinux.org/mirrorlist/?protocol=https' | awk '/^#Server/ {print $3; exit}')
+## Hardcoded until further notice
+HOSTMIRROR="http://mirror.neuf.no/archlinux/\$repo/os/\$arch"
 
 # Default options
-pacman_conf=$config_dir/pacman.conf
-makepkg_conf=$config_dir/makepkg.conf
+pacman_conf=$CONFIGDIR/pacman.conf
+makepkg_conf=$CONFIGDIR/makepkg.conf
 
-# img_directory=$(mktemp -dt .arch_img)
-img_directory="/tmp/arch_img"
-mkdir -p $img_directory
+# IMGDIRECTORY=$(mktemp -dt .arch_img)
+IMGDIRECTORY="/tmp/arch_img"
+mkdir -p $IMGDIRECTORY
 
 
 orig_argv=("$0" "$@")
@@ -88,20 +92,20 @@ error() {
 
 exec_nspawn(){
     local container=$1
-    systemd-nspawn -q --as-pid2 -D "$build_directory/$container" "${@:2}"
+    systemd-nspawn -q --as-pid2 -D "$BUILDDIRECTORY/$container" "${@:2}"
 }
 
 cleanup_root_volume(){
     warning "Removing root container..."
-    rm -rf "$build_directory/root"
+    rm -rf "$BUILDDIRECTORY/root"
 }
 
 # $1 -> name of container
 remove_snapshot (){
     local build=$1
     msg2 "Delete snapshot for $build..."
-    umount "$build_directory/$build" &> /dev/null || true
-    rm -rf "$build_directory"/{${build},${build}_upperdir,${build}_workdir}
+    umount "$BUILDDIRECTORY/$build" &> /dev/null || true
+    rm -rf "$BUILDDIRECTORY"/{${build},${build}_upperdir,${build}_workdir}
 }
 
 # $1 -> name of container
@@ -112,11 +116,11 @@ create_snapshot (){
     trap '{ remove_snapshot $build ; trap - INT; kill -INT $$; }' INT
 
     msg2 "Create overlayfs for $build..."
-    mkdir -p "$build_directory"/{${build},${build}_upperdir,${build}_workdir}
+    mkdir -p "$BUILDDIRECTORY"/{${build},${build}_upperdir,${build}_workdir}
     mount -t overlay overlay \
-        -o lowerdir="$build_directory/root",upperdir="$build_directory/${build}_upperdir",workdir="$build_directory/${build}_workdir" \
-        "$build_directory/${build}"
-    touch "$build_directory/$build"
+        -o lowerdir="$BUILDDIRECTORY/root",upperdir="$BUILDDIRECTORY/${build}_upperdir",workdir="$BUILDDIRECTORY/${build}_workdir" \
+        "$BUILDDIRECTORY/${build}"
+    touch "$BUILDDIRECTORY/$build"
 }
 
 
@@ -135,7 +139,7 @@ cd /startdir
 sudo -u build SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg -sc --noconfirm || true
 __END__
     mkdir -p "./$build" || true
-    for pkgfile in "$build_directory/$build"/pkgdest/*; do
+    for pkgfile in "$BUILDDIRECTORY/$build"/pkgdest/*; do
         mv "$pkgfile" "./$build/"
     done
     chown -R "$src_owner" "./$build"
@@ -146,36 +150,33 @@ init_chroot(){
 
     check_root
 
-    if [ ! -d "$build_directory" ]; then
-        mkdir -p $build_directory
+    if [ ! -d "$BUILDDIRECTORY" ]; then
+        mkdir -p $BUILDDIRECTORY
     fi
 
     # Prepare root chroot
-    if [ ! -d "$build_directory"/root ]; then
+    if [ ! -d "$BUILDDIRECTORY"/root ]; then
 
         msg "Preparing chroot"
         trap '{ cleanup_root_volume; exit 1; }' ERR
         trap '{ cleanup_root_volume; trap - INT; kill -INT $$; }' INT
 
         msg2 "Extracting image into container..."
-        mkdir -p $build_directory/root
-        tar xvf "$img_directory/$bootstrap_img" -C "$build_directory/root" --strip-components=1 > /dev/null
+        mkdir -p $BUILDDIRECTORY/root
+        tar xvf "$IMGDIRECTORY/$bootstrap_img" -C "$BUILDDIRECTORY/root" --strip-components=1 > /dev/null
 
-        # host_mirror=$(curl -s 'https://www.archlinux.org/mirrorlist/?protocol=https' | awk '/^#Server/ {print $3; exit}')
-        ## Hardcoded until further notice
-        host_mirror="http://mirror.neuf.no/archlinux/\$repo/os/\$arch"
 
-        printf 'Server = %s\n' "$host_mirror" > "$build_directory"/root/etc/pacman.d/mirrorlist
-        printf '%s.UTF-8 UTF-8\n' en_US de_DE > "$build_directory"/root/etc/locale.gen
-        printf 'LANG=en_US.UTF-8\n' > "$build_directory"/root/etc/locale.conf
+        printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
+        printf '%s.UTF-8 UTF-8\n' en_US de_DE > "$BUILDDIRECTORY"/root/etc/locale.gen
+        printf 'LANG=en_US.UTF-8\n' > "$BUILDDIRECTORY"/root/etc/locale.conf
 
         echo $makepkg_conf
         echo $pacman_conf
 
-        cp $makepkg_conf "$build_directory"/root/etc/makepkg.conf
-        cp $pacman_conf "$build_directory"/root/etc/pacman.conf
+        cp $makepkg_conf "$BUILDDIRECTORY"/root/etc/makepkg.conf
+        cp $pacman_conf "$BUILDDIRECTORY"/root/etc/pacman.conf
 
-        systemd-machine-id-setup --root="$build_directory"/root
+        systemd-machine-id-setup --root="$BUILDDIRECTORY"/root
         msg2 "Setting up keyring, this might take a while..."
         # exec_nspawn root pacman-key --init #&> /dev/null
         # exec_nspawn root pacman-key --populate archlinux #&> /dev/null
@@ -186,13 +187,18 @@ init_chroot(){
         exec_nspawn root pacman -S base-devel --noconfirm --ignore pacman-git
         exec_nspawn root locale-gen
 
-        printf 'build ALL = NOPASSWD: /usr/bin/pacman\n' > "$build_directory"/root/etc/sudoers.d/build-pacman
+        printf 'build ALL = NOPASSWD: /usr/bin/pacman\n' > "$BUILDDIRECTORY"/root/etc/sudoers.d/build-pacman
         exec_nspawn root useradd -m -G wheel -s /bin/bash build
 
         msg2 "Installing pacman-git"
         exec_nspawn root bash -c "yes | pacman -S pacman-git"
-        cp $makepkg_conf "$build_directory"/root/etc/makepkg.conf
-        cp $pacman_conf "$build_directory"/root/etc/pacman.conf
+        cp $makepkg_conf "$BUILDDIRECTORY"/root/etc/makepkg.conf
+        cp $pacman_conf "$BUILDDIRECTORY"/root/etc/pacman.conf
+    else
+        printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
+        cp $makepkg_conf "$BUILDDIRECTORY"/root/etc/makepkg.conf
+        cp $pacman_conf "$BUILDDIRECTORY"/root/etc/pacman.conf
+        exec_nspawn root pacman -Syu --noconfirm
     fi
 }
 
@@ -205,8 +211,6 @@ cmd_build(){
 
     # trap '{ cleanup_snapshot; exit 1; }' ERR
     
-    exec_nspawn root pacman -Syu --noconfirm
-
     # Build 1
     msg "Starting build1..."
     create_snapshot "build1"
@@ -269,8 +273,23 @@ args(){
     done
 }
 
-if [ ! -e "$img_directory/$bootstrap_img" ]; then
-    curl -o  "$img_directory/$bootstrap_img" "$bootstrap_mirror/$bootstrap_img"
+
+if [[ -r "$CONFIGDIR/repro.conf" ]]; then
+    source "$CONFIGDIR/repro.conf"
+fi
+
+XDG_REPRO_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/repro"
+if [[ -r "$XDG_REPRO_DIR/repro.conf" ]]; then
+    source "$XDG_REPRO_DIR/repro.conf"
+elif [[ -r "$HOME/.repro.conf" ]]; then
+    source "$HOME/.repro.conf"
+fi
+
+
+if [ ! -e "$IMGDIRECTORY/$bootstrap_img" ]; then
+    curl -o  "$IMGDIRECTORY/$bootstrap_img" "$BOOTSTRAPMIRROR/$bootstrap_img"
+    curl -o  "$IMGDIRECTORY/$bootstrap_img.sig" "$BOOTSTRAPMIRROR/$bootstrap_img.sig"
+    gpg --verify "$IMGDIRECTORY/$bootstrap_img.sig" "$IMGDIRECTORY/$bootstrap_img"
 fi
 
 case "$1" in
