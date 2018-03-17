@@ -11,7 +11,6 @@ readonly bootstrap_img=archlinux-bootstrap-"$(date +%Y.%m)".01-"$(uname -m)".tar
 readonly config_dir=/home/fox/Git/prosjekter/Bash/devtools-repro
 
 # Default options
-use_rsync=false
 pacman_conf=$config_dir/pacman.conf
 makepkg_conf=$config_dir/makepkg.conf
 
@@ -94,22 +93,15 @@ exec_nspawn(){
 
 cleanup_root_volume(){
     warning "Removing root container..."
-    if is_subvolume "$build_directory/$build"; then 
-        btrfs subvolume delete "$build_directory/root" &> /dev/null
-    else
-        rm -rf "$build_directory/root"
-    fi
+    rm -rf "$build_directory/root"
 }
 
 # $1 -> name of container
 remove_snapshot (){
     local build=$1
     msg2 "Delete snapshot for $build..."
-    if is_subvolume "$build_directory/$build"; then 
-        btrfs subvolume delete "$build_directory/$build" &> /dev/null
-    else
-        rm -rf "$build_directory/$build"
-    fi
+    umount "$build_directory/$build" &> /dev/null || true
+    rm -rf "$build_directory"/{${build},${build}_upperdir,${build}_workdir}
 }
 
 # $1 -> name of container
@@ -119,21 +111,11 @@ create_snapshot (){
     trap '{ remove_snapshot $build ; exit 1; }' ERR
     trap '{ remove_snapshot $build ; trap - INT; kill -INT $$; }' INT
 
-    msg2 "Create snapshot for $build..."
-    if $use_rsync || ! is_btrfs "$build_directory/root"; then 
-        msg2 "Creating rsync snapshot"
-        mkdir -p "$build_directory/$build"
-		rsync -a --delete -W -x "$build_directory/root/" "$build_directory/$build"
-    else
-        msg2 "Creating btrfs snapshot"
-        if ! btrfs subvolume snapshot "$build_directory/root" "$build_directory/$build" &> /dev/null; then
-            error "Couldn't create snapshot, did you forget -R?"
-            remove_snapshot $build
-            use_rsync=true
-            create_snapshot $build
-        fi
-    fi
-
+    msg2 "Create overlayfs for $build..."
+    mkdir -p "$build_directory"/{${build},${build}_upperdir,${build}_workdir}
+    mount -t overlay overlay \
+        -o lowerdir="$build_directory/root",upperdir="$build_directory/${build}_upperdir",workdir="$build_directory/${build}_workdir" \
+        "$build_directory/${build}"
     touch "$build_directory/$build"
 }
 
@@ -176,14 +158,7 @@ init_chroot(){
         trap '{ cleanup_root_volume; trap - INT; kill -INT $$; }' INT
 
         msg2 "Extracting image into container..."
-        # mkdir -p $build_directory/root
-        # Turn into a subvolume if there is btrfs present
-        if ! $use_rsync && is_btrfs "$build_directory"; then 
-            msg "Creating btrfs root container"
-            btrfs subvolume create "$build_directory/root" > /dev/null
-        else
-            mkdir -p $build_directory/root
-        fi
+        mkdir -p $build_directory/root
         tar xvf "$img_directory/$bootstrap_img" -C "$build_directory/root" --strip-components=1 > /dev/null
 
         # host_mirror=$(curl -s 'https://www.archlinux.org/mirrorlist/?protocol=https' | awk '/^#Server/ {print $3; exit}')
@@ -279,7 +254,6 @@ Commands:
   help                        This help message
 
 General Options:
- -R                           Force the rsync subcontainer creation
  -C                           Specify pacman.conf to build with
  -M                           Specify makepkg.conf to build with
 __END__
@@ -288,7 +262,6 @@ __END__
 args(){
     while getopts :R arg; do
         case $arg in
-            R) use_rsync=true;;
             C) pacman_conf=$OPTARG;;
             M) makepkg_conf=$OPTARG;;
             *);;
