@@ -1,29 +1,26 @@
-#!/bin/sh
-
-# Misc functions i want from pacman and makepkg
-
+#!/bin/bash
 set -eE -o pipefail
 
 BUILDDIRECTORY=/var/lib/repro
+
 BOOTSTRAPMIRROR=https://mirror.archlinux.no/iso/latest
 readonly bootstrap_img=archlinux-bootstrap-"$(date +%Y.%m)".01-"$(uname -m)".tar.gz
-
 CONFIGDIR='REPRO_CONFIG_DIR'
 
 # HOSTMIRROR=$(curl -s 'https://www.archlinux.org/mirrorlist/?protocol=https' | awk '/^#Server/ {print $3; exit}')
 ## Hardcoded until further notice
 HOSTMIRROR="http://mirror.neuf.no/archlinux/\$repo/os/\$arch"
 
-# Default options
-pacman_conf=$CONFIGDIR/pacman.conf
-makepkg_conf=$CONFIGDIR/makepkg.conf
-
 # IMGDIRECTORY=$(mktemp -dt .arch_img)
 IMGDIRECTORY="/tmp/arch_img"
 mkdir -p $IMGDIRECTORY
 
 DIFFOSCOPE="diffoscope"
-run_diffoscope=0
+
+#Disorderfs defaults
+DISORDERFS_SHUFFLE_DIRENTS=no
+DISORDERFS_REVERSE_DIRENTS=yes
+DISORDERFS_SORT_DIRENTS=no
 
 orig_argv=("$0" "$@")
 src_owner=${SUDO_USER:-$USER}
@@ -106,25 +103,69 @@ cleanup_root_volume(){
 remove_snapshot (){
     local build=$1
     msg2 "Delete snapshot for $build..."
-    umount "$BUILDDIRECTORY/$build" &> /dev/null || true
-    rm -rf "$BUILDDIRECTORY"/{${build},${build}_upperdir,${build}_workdir}
+    if ((run_disorderfs)); then
+        umount "$BUILDDIRECTORY/$build" || true
+        umount "$BUILDDIRECTORY/${build}_disorder" || true
+    else
+        umount "$BUILDDIRECTORY/$build" || true
+    fi
+    rm -rf "$BUILDDIRECTORY"/{${build},${build}_upperdir,${build}_workdir,${build}_disorder} || true
 }
 
 # $1 -> name of container
 create_snapshot (){
     local build=$1
+    local disorderfs=$2
 
     trap '{ remove_snapshot $build ; exit 1; }' ERR
     trap '{ remove_snapshot $build ; trap - INT; kill -INT $$; }' INT
 
-    msg2 "Create overlayfs for $build..."
+    msg2 "Create snapshot for $build..."
     mkdir -p "$BUILDDIRECTORY"/{${build},${build}_upperdir,${build}_workdir}
-    mount -t overlay overlay \
-        -o lowerdir="$BUILDDIRECTORY/root",upperdir="$BUILDDIRECTORY/${build}_upperdir",workdir="$BUILDDIRECTORY/${build}_workdir" \
-        "$BUILDDIRECTORY/${build}"
+
+    if ((disorderfs)); then
+        # The idea is that instead of mounting overlayfs on $build when we want disorderfs, we mount it on
+        # ${build}_disorder so other functions dont have to care for the difference
+
+        mkdir "$BUILDDIRECTORY/${build}_disorder"
+        mount -t overlay overlay \
+            -o lowerdir="$BUILDDIRECTORY/root",upperdir="$BUILDDIRECTORY/${build}_upperdir",workdir="$BUILDDIRECTORY/${build}_workdir" \
+            "$BUILDDIRECTORY/${build}_disorder"
+        msg "Using disorderfs settings..."
+        disorderfs \
+            --multi-user=yes \
+            --shuffle-dirents=$DISORDERFS_SHUFFLE_DIRENTS \
+            --reverse-dirents=$DISORDERFS_REVERSE_DIRENTS \
+            --sort-dirents=$DISORDERFS_SORT_DIRENTS \
+            "$BUILDDIRECTORY/${build}_disorder" "$BUILDDIRECTORY/${build}"
+        # msg2 "--shuffle-dirents $DISORDERFS_SHUFFLE_DIRENTS"
+        # msg2 "--reverse-dirents $DISORDERFS_REVERSE_DIRENTS"
+        # msg2 "--sort-dirents $DISORDERFS_SORT_DIRENTS"
+    else
+        mount -t overlay overlay \
+            -o lowerdir="$BUILDDIRECTORY/root",upperdir="$BUILDDIRECTORY/${build}_upperdir",workdir="$BUILDDIRECTORY/${build}_workdir" \
+            "$BUILDDIRECTORY/${build}"
+    fi
     touch "$BUILDDIRECTORY/$build"
 }
 
+set_build_env(){
+    local build=$1
+    msg "Settings build environemnt..."
+    exec_nspawn $build \
+    tee /home/build/.bashrc <<-__END__
+export TZ=$TZ
+export LANG=$LANG
+export LC_ALL=$LC_ALL
+__END__
+
+    # Generate locale
+    exec_nspawn $build \
+bash <<-__END__
+echo $LOCALE > /etc/locale.gen
+locale-gen
+__END__
+}
 
 build_package(){
     local build=$1
@@ -140,7 +181,7 @@ chown build:build /srcpkgdest
 cd /startdir
 sudo -u build SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg -sc --noconfirm || true
 __END__
-    mkdir -p "./$build" || true
+    mkdir -p "./$build"
     for pkgfile in "$BUILDDIRECTORY/$build"/pkgdest/*; do
         mv "$pkgfile" "./$build/"
     done
@@ -212,19 +253,37 @@ cmd_build(){
     SOURCE_DATE_EPOCH=$(date +%s)
     msg "Using SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
 
-    # trap '{ cleanup_snapshot; exit 1; }' ERR
-    
-    # Build 1
+    # Build 1 - no disorderfs what so ever
     msg "Starting build1..."
-    create_snapshot "build1"
+    create_snapshot "build1" 0
     build_package "build1"
     remove_snapshot "build1"
 
-    # Build 2
-    msg "Starting build2..."
-    create_snapshot "build2"
-    build_package "build2"
-    remove_snapshot "build2"
+    # Get profiles
+    i=1
+    while read line
+    do
+        profiles[ $i ]="$line"        
+        (( i++ ))
+    done < <(ls $CONFIGDIR/profiles/*.conf | sort -R | tail -$num_builds)
+
+    for build_number in $(seq 1 $num_builds); do 
+        if [ "$user_profile" != ""]; then
+            snapshot_profile=$user_profile
+            snapshot_name=${snapshot_profile##*/}
+        else
+            snapshot_profile=${profiles[$build_number]}
+            snapshot_name=${snapshot_profile##*/}
+        fi
+        msg "Using profile: " $snapshot_name
+        source $snapshot_profile
+        build_number=$((build_number+1))
+        msg "Starting build$build_number..."
+        create_snapshot "build$build_number" $run_disorderfs
+        set_build_env "build$build_number"
+        build_package "build$build_number"
+        remove_snapshot "build$build_number"
+    done
 
     # Remove traps so we don't accidental an rm -rf
     trap - ERR INT
@@ -233,17 +292,23 @@ cmd_build(){
     is_error=false
     for pkgfile in ./build1/*; do
         pkgfile=${pkgfile##*/}
-        sha512sum -b ./build1/$pkgfile | read build1_checksum _
-        sha512sum -b ./build2/$pkgfile | read build2_checksum _
-        if [ "$build1_checksum" = "$build2_checksum" ]; then
-          msg2 "$pkgfile is reproducible!"
-        else
-          warning "$pkgfile is not reproducible!"
-          if ((run_diffoscope)); then
-              $DIFFOSCOPE ./build1/$pkgfile ./build1/$pkgbuild || true
-          fi
-          is_error=true
-        fi
+        sha512sum -b ./build1/$pkgfile | read refference_build_checksum _
+
+        for build_number in $(seq 1 $num_builds); do 
+            snapshot_profile=${profiles[$build_number]}
+            snapshot_name=${snapshot_profile##*/}
+            build_number=$((build_number+1))
+            sha512sum -b ./build$build_number/$pkgfile | read other_build_checksum _
+            if [ "$refference_build_checksum" = "$other_build_checksum" ]; then
+              msg2 "$pkgfile from build$build_number is reproducible with $snapshot_name!"
+            else
+              warning "$pkgfile from build$build_number is not reproducible with $snapshot_name!"
+              if ((run_diffoscope)); then
+                  $DIFFOSCOPE ./build1/$pkgfile ./build$build_number/$pkgbuild || true
+              fi
+              is_error=true
+            fi
+        done
     done
 
     if $is_error; then
@@ -268,23 +333,44 @@ Commands:
   help                        This help message
 
 General Options:
- -C                           Specify repro.conf to build with
- -P                           Specify pacman.conf to build with
- -M                           Specify makepkg.conf to build with
+ -b <num>                     Number of subsequent builds to run with random profiles
  -d                           Run diffoscope if packages are not reproducible
+ -p <profile>                 Run builds with a set profile
+ -o                           Run tests with disorderfs 
+ -C <file>                    Specify repro.conf to build with
+ -P <file>                    Specify pacman.conf to build with
+ -M <file>                    Specify makepkg.conf to build with
 __END__
 }
 
+# Default options
+pacman_conf=$CONFIGDIR/pacman.conf
+makepkg_conf=$CONFIGDIR/makepkg.conf
+num_builds=1 #We just do two builds as default
+user_profile=""
+run_diffoscope=0
+run_disorderfs=0
+
 args(){
-    while getopts :dC:P:M: arg; do
+    while getopts :dob:r:p:C:P:M: arg; do
         case $arg in
             C) REPRO_CONF=$OPTARG;;
             P) pacman_conf=$OPTARG;;
             M) makepkg_conf=$OPTARG;;
-            d) run_diffoscope=1
+            b) num_builds=$OPTARG;;
+            p) user_profile=$OPTARG;;
+            d) run_diffoscope=1;;
+            o) run_disorderfs=1;;
             *);;
         esac
     done
+    
+    # Sanity check
+    profiles_availabe=$(ls $CONFIGDIR/profiles | wc -l)
+    if (( num_builds > profiles_availabe )); then
+        error "Not enough profiles available to run $num_builds builds"
+        exit 0
+    fi
 }
 
 
