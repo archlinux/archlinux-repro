@@ -10,7 +10,7 @@ source=('git+https://github.com/Foxboron/devtools-repro')
 sha256sums=('SKIP')
 conflicts=('devtools-repro')
 provides=('devtools-repro')
-depends=('gnupg' 'curl')
+depends=('gnupg' 'curl' 'diffoscope')
 makedepends=('git' 'asciidoc')
 
 pkgver() {

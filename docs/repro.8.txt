@@ -41,13 +41,18 @@ Commands
 
 Options
 -------
-*-C*::
+*-d*::
+        When enabled linkman:diffoscope[1] is run on the produced packages.
+        `DIFFOSCOPE` can be set in linkman:repro.conf[5] to change the
+        diffoscope command.
+
+*-C* <file>::
         Specify a linkman:repro.conf[5] file to use for the build container.
 
-*-P*::
+*-P* <file>::
         Specify a linkman:pacman.conf[5] file to use for the build container.
 
-*-M*::
+*-M* <file>::
         Specify a linkman:makepkg.conf[5] file to use for the build container.
 
 

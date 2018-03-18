@@ -22,6 +22,8 @@ makepkg_conf=$CONFIGDIR/makepkg.conf
 IMGDIRECTORY="/tmp/arch_img"
 mkdir -p $IMGDIRECTORY
 
+DIFFOSCOPE="diffoscope"
+run_diffoscope=0
 
 orig_argv=("$0" "$@")
 src_owner=${SUDO_USER:-$USER}
@@ -203,6 +205,7 @@ init_chroot(){
 }
 
 cmd_build(){
+    shopt -s lastpipe
 
     check_root
 
@@ -223,15 +226,22 @@ cmd_build(){
     build_package "build2"
     remove_snapshot "build2"
 
+    # Remove traps so we don't accidental an rm -rf
+    trap - ERR INT
+
     msg "Comparing hashes..."
     is_error=false
     for pkgfile in ./build1/*; do
-        sha512sum -b $pkgfile | read build1_checksum _
-        sha512sum -b $pkgfile | read build2_checksum _
+        pkgfile=${pkgfile##*/}
+        sha512sum -b ./build1/$pkgfile | read build1_checksum _
+        sha512sum -b ./build2/$pkgfile | read build2_checksum _
         if [ "$build1_checksum" = "$build2_checksum" ]; then
-          msg2 "${pkgfile##*/} is reproducible!"
+          msg2 "$pkgfile is reproducible!"
         else
-          warning "${pkgfile##*/} is not reproducible!"
+          warning "$pkgfile is not reproducible!"
+          if ((run_diffoscope)); then
+              $DIFFOSCOPE ./build1/$pkgfile ./build1/$pkgbuild || true
+          fi
           is_error=true
         fi
     done
@@ -261,15 +271,17 @@ General Options:
  -C                           Specify repro.conf to build with
  -P                           Specify pacman.conf to build with
  -M                           Specify makepkg.conf to build with
+ -d                           Run diffoscope if packages are not reproducible
 __END__
 }
 
 args(){
-    while getopts :R arg; do
+    while getopts :dC:P:M: arg; do
         case $arg in
             C) REPRO_CONF=$OPTARG;;
             P) pacman_conf=$OPTARG;;
             M) makepkg_conf=$OPTARG;;
+            d) run_diffoscope=1
             *);;
         esac
     done

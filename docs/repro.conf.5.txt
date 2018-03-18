@@ -25,18 +25,22 @@ taking priority.
 
 Options
 -------
+**BOOTSTRAPMIRROR=**"https://mirror.archlinux.no/iso/latest"::
+        Download location of the bootstrap image used for creating the container. 
+
+**BUILDDIRECTORY=**"/var/lib/repro"::
+        Location where the containers should be stored.
+
+**DIFFOSCOPE=**"diffoscope"::
+        Sets the linkman:diffoscope[1] command to be ran when unreproducible packages are
+        encountered.
+
 **CONFIGDIR=**"/etc/devtools-repro/repro"::
         Location of the location of makepkg.conf and pacman.conf used for the
         container.
 
-**BOOTSTRAPMIRROR=**"https://mirror.archlinux.no/iso/latest"::
-        Download location of the bootstrap image used for creating the container. 
-
 **HOSTMIRROR=**"http://mirror.neuf.no/archlinux/\$repo/os/\$arch"::
         The mirror used inside the container by pacman.
-
-**BUILDDIRECTORY=**"/var/lib/repro"::
-        Location where the containers should be stored.
 
 **IMGDIRECTORY=**"/tmp/arch_img"::
         Location where the Arch Linux bootstrap image should be downloaded to.
