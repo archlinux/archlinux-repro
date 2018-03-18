@@ -1,24 +1,29 @@
 PROGNM = devtools-repro
-PREFIX ?= /usr
-SHRDIR ?= $(PREFIX)/share
+PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
-LIBDIR ?= $(PREFIX)/lib
-DOCSDIR ?= $(SHRDIR)/doc
+DOCDIR ?= $(PREFIX)/share/doc
+MANDIR ?= $(PREFIX)/share/man
 CONFDIR ?= /etc
+MANS = $(basename $(wildcard docs/*.txt))
 
 all: man repro
-man: docs/repro.8 docs/repro.conf.5
+man: $(MANS)
+$(MANS):
 
-repro.%:
-	a2x --no-xmllint --asciidoc-opts="-f docs/asciidoc.conf" -d manpage -f manpage -D docs $@.txt
+docs/repro.%: docs/repro.%.txt docs/asciidoc.conf
+	a2x --no-xmllint --asciidoc-opts="-f docs/asciidoc.conf" -d manpage -f manpage -D docs $<
 
 repro: repro.in
 	m4 -DREPRO_CONFIG_DIR=$(CONFDIR)/$(PROGNM) $< >$@
 
 install: repro man
-	@install -Dm755 repro	-t $(DESTDIR)$(BINDIR)
-	@install -Dm644 conf/*   -t $(DESTDIR)$(CONFDIR)/$(PROGNM)
-	@install -Dm644 examples/*   -t $(DESTDIR)$(SHRDIR)/$(PROGNM)
-	@install -Dm644 docs/repro.8   -t $(DESTDIR)$(SHRDIR)/man/man8
-	@install -Dm644 docs/repro.conf.5   -t $(DESTDIR)$(SHRDIR)/man/man5
-	@install -Dm644 LICENSE -t $(DESTDIR)$(SHRDIR)/licenses/$(PROGNM)
+	install -Dm755 repro -t $(DESTDIR)$(BINDIR)
+	install -Dm644 conf/* -t $(DESTDIR)$(CONFDIR)/$(PROGNM)
+	install -Dm644 examples/*   -t $(DESTDIR)$(DOCDIR)/$(PROGNM)
+	for manfile in $(MANS); do \
+		install -Dm644 $$manfile -t $(DESTDIR)$(MANDIR)/man$${manfile##*.}; \
+	done;
+	install -Dm644 LICENSE -t $(DESTDIR)$(SHRDIR)/licenses/$(PROGNM)
+
+clean:
+	rm -f repro $(MANS)
