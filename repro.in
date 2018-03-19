@@ -328,7 +328,23 @@ cmd_build(){
 }
 
 cmd_check(){
-    echo "Doing a build!"
+    local pkg="${1}"
+    local cachedir="cache"
+    check_root
+
+    msg "Starting build..."
+    create_snapshot "build"
+
+    msg2 "Preparing packages"
+    mkdir -p "${cachedir}"
+    mapfile -t packages < <(buildinfo -d "${pkg}" "${cachedir}")
+    msg2 "Finished preparing packages"
+    msg "Installing packages"
+    exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" pacman -U ${packages[*]}
+    # We now have all packages with their current versions in the build container
+
+    # TODO:
+    msg "Do build..."
 }
 
 cmd_help(){
