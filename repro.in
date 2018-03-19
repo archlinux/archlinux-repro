@@ -234,6 +234,14 @@ init_chroot(){
         printf 'build ALL = NOPASSWD: /usr/bin/pacman\n' > "$BUILDDIRECTORY"/root/etc/sudoers.d/build-pacman
         exec_nspawn root useradd -m -G wheel -s /bin/bash build
 
+        exec_nspawn root \
+    bash <<-__END__
+set -e
+mkdir -p /home/build/.gnupg
+echo keyserver-options auto-key-retrieve > /home/build/.gnupg/gpg.conf 
+chown -R build /home/build/.gnupg
+__END__
+
         msg2 "Installing pacman-git"
         exec_nspawn root bash -c "yes | pacman -S pacman-git"
         cp $makepkg_conf "$BUILDDIRECTORY"/root/etc/makepkg.conf
