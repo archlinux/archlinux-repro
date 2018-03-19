@@ -180,7 +180,7 @@ chown build:build /pkgdest
 mkdir -p /srcpkgdest
 chown build:build /srcpkgdest
 cd /startdir
-sudo -u build SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg -sc --noconfirm || true
+sudo -u build SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg -sc --noconfirm
 __END__
     mkdir -p "./$build"
     for pkgfile in "$BUILDDIRECTORY/$build"/pkgdest/*; do
@@ -269,7 +269,7 @@ cmd_build(){
     done < <(ls $CONFIGDIR/profiles/*.conf | sort -R | tail -$num_builds)
 
     for build_number in $(seq 1 $num_builds); do 
-        if [ "$user_profile" != ""]; then
+        if [ "$user_profile" != "" ]; then
             snapshot_profile=$user_profile
             snapshot_name=${snapshot_profile##*/}
         else
