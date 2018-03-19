@@ -20,10 +20,10 @@ pkgver() {
 
 build() {
     cd devtools-repro
-    make DESTDIR="$pkgdir"
+    make PREFIX="/usr" DESTDIR="$pkgdir"
 }
 
 package() {
     cd devtools-repro
-    make DESTDIR="$pkgdir" install
+    make PREFIX="/usr" DESTDIR="$pkgdir" install
 }
