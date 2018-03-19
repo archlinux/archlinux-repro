@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+
+# Copyright (c) 2018 Robin Broda <robin@broda.me>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+declare -i format=1 builddate
+declare -a buildenv options installed
+declare pkgname pkgbase pkgver pkgbuild_sha256sum packager builddir
+
+# 1: line
+# 2: field index (starts at 1)
+# Return: field value
+function get_field () {
+	awk -F' = ' "{print \$${2}}" <<< "${1}"
+}
+
+# Desc: Parses line into current global state
+# 1: line
+# Return: nothing
+function parse_line () {
+	key=$(get_field "${1}" 1)
+	val=$(get_field "${1}" 2)
+
+	case "${key}" in
+	"format")
+		if [[ ${format} -ne ${val} ]]; then
+			echo "incompatible format (want ${format}, got ${val})" >&2
+			exit 1
+		fi
+		;;
+	"pkgname") pkgname="${val}";;
+	"pkgbase") pkgbase="${val}";;
+	"pkgver") pkgver="${val}";;
+	"pkgbuild_sha256sum") pkgbuild_sha256sum="${val}";;
+	"packager") packager="${val}";;
+	"builddate") builddate="${val}";;
+	"builddir") builddir="${val}";;
+	"buildenv") buildenv+=("${val}");;
+	"options") options+=("${val}");;
+	"installed") installed+=("${val}");;
+	*)
+		echo "key '${key}' unimplemented" >&2
+		;;
+	esac
+}
+
+# Desc: Parses buildinfo from file into current global state
+# 1: .BUILDINFO path
+function parse_buildinfo () {
+	while read -r line; do
+		parse_line "${line}"
+	done < "${1}"
+}
+
+# Desc: Parses buildinfo from provided package into current global state
+# 1: Package path
+function parse_package () {
+	while read -r line; do
+		parse_line "${line}"
+	done <<< "$(tar xOf "${1}" .BUILDINFO 2>/dev/null)"
+}
+
+readonly archive_url="https://archive.archlinux.org/packages"
+
+# Desc: get ALA link for given package
+# 1: Package
+# 2: Architecture
+function get_archive_links () {
+  local pkg="$(rev <<< "${1}")"
+  local pkgname="$(cut -d'-' -f3- <<< "${pkg}" | rev)"
+
+	echo "${archive_url}/${1:0:1}/${pkgname}/${1}-${2}.pkg.tar.xz"
+}
+
+# 1: Package
+function select_archive_link () {
+  for pkgarch in x86_64 any; do
+  	local links="$(get_archive_links "${1}" "${pkgarch}")"
+  	for link in ${links}; do
+		  if verify_archive_link "${link}"; then
+		  	echo "${link}"
+		  	return
+		  fi
+		done
+	done
+}
+
+# 1: Package archive link
+function verify_archive_link () {
+	curl -IfLlso /dev/null "${1}" 
+	return $?
+}
+
+# 1: Package archive link
+# 2: Target directory
+function download_archive_package () {
+	local filename="${1}.pkg.tar.xz"
+	if [[ -f "${2}/${filename}" ]]; then
+		echo "Hit cache for ${filename}" >&2
+		echo "${2}/${filename}"
+	else
+		local pwd="$(pwd)"
+		local workdir="$(mktemp -d)"
+		local target="$(select_archive_link "${1}")"
+		cd "${workdir}"
+		if verify_archive_link "${target}"; then
+			echo "Downloading ${filename}" >&2
+			curl -L "${target}" -o "${filename}" 2>/dev/null
+			curl -L "${target}.sig" -o "${filename}.sig" 2>/dev/null
+			if gpg --keyring /etc/pacman.d/gnupg/pubring.gpg --verify "${filename}.sig" 2>/dev/null; then
+				mv "${filename}" "${2}/"
+				echo "${2}/${filename}"
+			else
+				echo "${filename} doesn't pass signature verification" >&2
+				echo "check ${workdir}" >&2
+				exit 1
+			fi
+		fi
+		cd "${pwd}"
+		rm -r "${workdir}"
+	fi
+}
+
+declare action
+while [ "$#" -gt 1 ]; do
+	case "${1}" in
+	-i)
+		action="info"
+		shift 1
+		;;
+	-p)
+		action="packages"
+		shift 1
+		;;
+	-d)
+		action="download"
+		shift 1
+		;;
+	-*)
+		echo "unknown option: ${1}" >&2
+		exit 1
+		;;
+	*)
+		break
+		;;
+	esac
+done
+
+if [[ "${action}" == "" ]]; then
+	echo "no option given" >&2
+	exit 1
+fi
+
+declare file="$(readlink -e "${1}")"
+shift 1
+if [[ "${file}" =~ \.pkg ]]; then
+	parse_package "${file}"
+else
+	parse_buildinfo "${file}"
+fi
+
+case "${action}" in
+"info")
+	echo -e "Name               : ${pkgname}"
+	echo -e "Base Name          : ${pkgbase}"
+	echo -e "Version            : ${pkgver}"
+	echo -e "Checksum (sha256)  : ${pkgbuild_sha256sum}"
+	echo -e "Packager           : ${packager}"
+	echo -e "Build Date         : ${builddate}"
+	echo -e "Build Directory    : ${builddir}"
+	echo -e "Build Environment  : ${buildenv[*]}"
+	echo -e "Options            : ${options[*]}"
+	echo -e "Installed Packages : ${#installed[@]}"
+	;;
+"packages")
+  for ipkg in "${installed[@]}"; do
+    select_archive_link "${ipkg}"
+  done
+  ;;
+"download")
+	if [ "$#" -gt 0 ]; then
+		readonly target_dir="${1}"
+		shift 1
+		if [[ -d "${target_dir}" ]]; then
+			for ipkg in "${installed[@]}"; do
+				download_archive_package "${ipkg}" "${target_dir}"
+			done
+		else
+			echo "Target directory doesn't exist" >&2
+			exit 1
+		fi
+	else
+		echo "Target directory not specified" >&2
+		exit 1
+	fi
+	;;
+esac
