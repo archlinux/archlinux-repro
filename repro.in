@@ -259,7 +259,7 @@ cmd_build(){
 
     check_root
 
-    SOURCE_DATE_EPOCH=$(date +%s)
+    SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(date +%s)}
     msg "Using SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
 
     # Build 1 - no disorderfs what so ever
