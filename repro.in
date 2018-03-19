@@ -313,7 +313,7 @@ cmd_build(){
             else
               warning "$pkgfile from build$build_number is not reproducible with $snapshot_name!"
               if ((run_diffoscope)); then
-                  $DIFFOSCOPE ./build1/$pkgfile ./build$build_number/$pkgbuild || true
+                  PYTHONIOENCODING=utf-8 $DIFFOSCOPE ./build1/$pkgfile ./build$build_number/$pkgfile || true
               fi
               is_error=true
             fi
