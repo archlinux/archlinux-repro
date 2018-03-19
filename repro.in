@@ -113,6 +113,7 @@ remove_snapshot (){
 }
 
 # $1 -> name of container
+# $2 -> disorderfs; 0 -> false, 1 -> true
 create_snapshot (){
     local build=$1
     local disorderfs=$2
