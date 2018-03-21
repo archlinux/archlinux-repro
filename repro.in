@@ -91,7 +91,7 @@ error() {
 
 exec_nspawn(){
     local container=$1
-    systemd-nspawn -q --as-pid2 -D "$BUILDDIRECTORY/$container" "${@:2}"
+    systemd-nspawn -q --as-pid2 --register=no -D "$BUILDDIRECTORY/$container" "${@:2}"
 }
 
 cleanup_root_volume(){
