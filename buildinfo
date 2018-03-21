@@ -153,6 +153,10 @@ while [ "$#" -gt 1 ]; do
 		action="download"
 		shift 1
 		;;
+	-f)
+		action="field"
+		shift 1
+		;;
 	-*)
 		echo "unknown option: ${1}" >&2
 		exit 1
@@ -193,6 +197,9 @@ case "${action}" in
 	for ipkg in "${installed[@]}"; do
 		select_archive_link "${ipkg}"
 	done
+	;;
+"field")
+    echo -e "${!1}"
 	;;
 "download")
 	if [ "$#" -gt 0 ]; then
