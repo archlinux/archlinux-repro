@@ -112,7 +112,8 @@ function verify_archive_link () {
 # 2: Target directory
 function download_archive_package () {
 	local filename="${1}.pkg.tar.xz"
-	if [[ -f "${2}/${filename}" ]]; then
+	local cachedir=$(readlink -e ${2})
+	if [[ -f "${cachedir}/${filename}" ]]; then
 		echo "Hit cache for ${filename}" >&2
 		echo "${2}/${filename}"
 	else
@@ -125,7 +126,7 @@ function download_archive_package () {
 			curl -L "${target}" -o "${filename}" 2>/dev/null
 			curl -L "${target}.sig" -o "${filename}.sig" 2>/dev/null
 			if gpg --keyring /etc/pacman.d/gnupg/pubring.gpg --verify "${filename}.sig" 2>/dev/null; then
-				mv "${filename}" "${2}/"
+				mv "${filename}" "${cachedir}/"
 				echo "${2}/${filename}"
 			else
 				echo "${filename} doesn't pass signature verification" >&2
