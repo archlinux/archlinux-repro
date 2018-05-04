@@ -110,6 +110,7 @@ remove_snapshot (){
         umount "$BUILDDIRECTORY/$build" || true
     fi
     rm -rf "$BUILDDIRECTORY"/{${build},${build}_upperdir,${build}_workdir,${build}_disorder} || true
+    trap - ERR INT
 }
 
 # $1 -> name of container
@@ -252,6 +253,8 @@ __END__
         cp $pacman_conf "$BUILDDIRECTORY"/root/etc/pacman.conf
         exec_nspawn root pacman -Syu --noconfirm
     fi
+
+    trap - ERR INT
 }
 
 cmd_build(){
@@ -331,6 +334,9 @@ cmd_check(){
     local pkg="${1}"
     local cachedir="cache"
     check_root
+
+
+    trap - ERR INT
 
     msg "Starting build..."
     create_snapshot "build"
