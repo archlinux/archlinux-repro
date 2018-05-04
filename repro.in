@@ -345,7 +345,37 @@ cmd_check(){
     trap - ERR INT
 
     msg "Starting build..."
-    create_snapshot "build"
+    create_snapshot "build" 0
+    build="build"
+    
+    packager=$(buildinfo -f "${pkg}" "packager")
+    builddir=$(buildinfo -f "${pkg}" "builddir")
+    builddate=$(buildinfo -f "${pkg}" "builddate")
+    _pkgver=$(buildinfo -f "${pkg}" "pkgver")
+    # pkgrel=${_pkgver##*-}
+    # pkgver=${_pkgver%-*}
+    # pkgbase=$(buildinfo -f "${pkg}" "pkgbase")
+    pkgver=20171213
+    pkgrel=1
+    pkgbase="archlinux-keyring"
+
+
+    # Father I have sinned
+    exec_nspawn "build" \
+    bash <<-__END__
+shopt -s globstar
+echo PACKAGER="$packager" > /home/build/.makepkg.conf
+mkdir -p $builddir
+pacman -S asp --noconfirm
+asp checkout $pkgbase
+cd $pkgbase
+git grep --all-match -e pkgver=$pkgver -e pkgrel=$pkgrel $(git rev-list --all -- repos/) -- repos/ | cut -d: -f1 | head -1 | xargs git checkout
+git grep --all-match -e pkgver=$pkgver -e pkgrel=$pkgrel $(git rev-list --all -- repos/) -- repos/
+echo $pkgver
+echo $pkgrel
+mv -f ./repos/**/PKGBUILD $builddir
+pacman -Rs asp --no-confirm
+__END__
 
     msg2 "Preparing packages"
     mkdir -p "${cachedir}"
@@ -353,10 +383,8 @@ cmd_check(){
     msg2 "Finished preparing packages"
     msg "Installing packages"
     exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" pacman -U ${packages[*]}
-    # We now have all packages with their current versions in the build container
 
-    # TODO:
-    msg "Do build..."
+    build_package "build" $builddir
 }
 
 cmd_help(){
