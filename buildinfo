@@ -24,19 +24,11 @@ declare -i format=1 builddate
 declare -a buildenv options installed
 declare pkgname pkgbase pkgver pkgbuild_sha256sum packager builddir
 
-# 1: line
-# 2: field index (starts at 1)
-# Return: field value
-function get_field () {
-	awk -F' = ' "{print \$${2}}" <<< "${1}"
-}
-
 # Desc: Parses line into current global state
 # 1: line
 # Return: nothing
 function parse_line () {
-	key=$(get_field "${1}" 1)
-	val=$(get_field "${1}" 2)
+	IFS=$' = ' read key val <<< "${1}"
 
 	case "${key}" in
 	"format")
