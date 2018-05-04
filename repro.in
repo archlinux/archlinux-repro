@@ -171,8 +171,13 @@ __END__
 
 build_package(){
     local build=$1
+    local builddir=${2:-"/startdir"}
+    nspawn_opts=""
+    if [ "$builddir" = "/startdir" ]; then
+        nspawn_opts="--bind=\"$PWD:$builddir\""
+    fi
     exec_nspawn $build \
-        --bind="$PWD:/startdir" \
+        $nspawn_opts \
         --bind="$PWD:/srcdest" \
 bash <<-__END__
 set -e
@@ -180,7 +185,8 @@ mkdir -p /pkgdest
 chown build:build /pkgdest
 mkdir -p /srcpkgdest
 chown build:build /srcpkgdest
-cd /startdir
+mkdir -p $builddir || true
+cd $buildir
 sudo -u build SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg -sc --noconfirm
 __END__
     mkdir -p "./$build"
