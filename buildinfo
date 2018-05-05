@@ -53,20 +53,24 @@ function parse_line () {
 	esac
 }
 
+# Desc: Parses buildinfo from string into current global state
+# STDIN: .BUILDINFO
+function parse () {
+	while read -r line; do
+		parse_line "${line}"
+	done
+}
+
 # Desc: Parses buildinfo from file into current global state
 # 1: .BUILDINFO path
 function parse_buildinfo () {
-	while read -r line; do
-		parse_line "${line}"
-	done < "${1}"
+	parse < "${1}"
 }
 
 # Desc: Parses buildinfo from provided package into current global state
 # 1: Package path
 function parse_package () {
-	while read -r line; do
-		parse_line "${line}"
-	done <<< "$(tar xOf "${1}" .BUILDINFO 2>/dev/null)"
+	parse <<< "$(tar xOf "${1}" .BUILDINFO 2>/dev/null)"
 }
 
 readonly archive_url="https://archive.archlinux.org/packages"
