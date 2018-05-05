@@ -149,6 +149,10 @@ while [ "$#" -gt 1 ]; do
 		action="field"
 		shift 1
 		;;
+	-ff)
+		action="field_all"
+		shift 1
+		;;
 	-*)
 		echo "unknown option: ${1}" >&2
 		exit 1
@@ -192,6 +196,14 @@ case "${action}" in
 	;;
 "field")
     echo -e "${!1}"
+	;;
+"field_all")
+	for field in pkgname pkgbase pkgver pkgbuild_sha256sum packager builddate builddir; do
+		echo -e "${field}=${data[${field}]}"
+	done
+	echo -e "buildenv=${buildenv[*]}"
+	echo -e "options=${options[*]}"
+	echo -e "installed=${installed[*]}"
 	;;
 "download")
 	if [ "$#" -gt 0 ]; then
