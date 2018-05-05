@@ -22,7 +22,7 @@
 
 declare -i format=1 builddate
 declare -a buildenv options installed
-declare pkgname pkgbase pkgver pkgbuild_sha256sum packager builddir
+declare -A data
 
 # Desc: Parses line into current global state
 # 1: line
@@ -36,19 +36,13 @@ function parse_line () {
 			echo "incompatible format (want ${format}, got ${val})" >&2
 			exit 1
 		fi
+		data["${key}"]="${val}"
 		;;
-	"pkgname") pkgname="${val}";;
-	"pkgbase") pkgbase="${val}";;
-	"pkgver") pkgver="${val}";;
-	"pkgbuild_sha256sum") pkgbuild_sha256sum="${val}";;
-	"packager") packager="${val}";;
-	"builddate") builddate="${val}";;
-	"builddir") builddir="${val}";;
 	"buildenv") buildenv+=("${val}");;
 	"options") options+=("${val}");;
 	"installed") installed+=("${val}");;
 	*)
-		echo "key '${key}' unimplemented" >&2
+		data["${key}"]="${val}"
 		;;
 	esac
 }
@@ -88,7 +82,7 @@ function get_archive_links () {
 # 1: Package
 function select_archive_link () {
 	for pkgarch in x86_64 any; do
-		local links="$(get_archive_links "${1}" "${pkgarch}")"
+		local links="$(get_archive_links "${1}" "${data[pkgarch]}")"
 		for link in ${links}; do
 			if verify_archive_link "${link}"; then
 				echo "${link}"
@@ -179,13 +173,13 @@ fi
 
 case "${action}" in
 "info")
-	echo -e "Name               : ${pkgname}"
-	echo -e "Base Name          : ${pkgbase}"
-	echo -e "Version            : ${pkgver}"
-	echo -e "Checksum (sha256)  : ${pkgbuild_sha256sum}"
-	echo -e "Packager           : ${packager}"
-	echo -e "Build Date         : ${builddate}"
-	echo -e "Build Directory    : ${builddir}"
+	echo -e "Name               : ${data[pkgname]}"
+	echo -e "Base Name          : ${data[pkgbase]}"
+	echo -e "Version            : ${data[pkgver]}"
+	echo -e "Checksum (sha256)  : ${data[pkgbuild_sha256sum]}"
+	echo -e "Packager           : ${data[packager]}"
+	echo -e "Build Date         : ${data[builddate]}"
+	echo -e "Build Directory    : ${data[builddir]}"
 	echo -e "Build Environment  : ${buildenv[*]}"
 	echo -e "Options            : ${options[*]}"
 	echo -e "Installed Packages : ${#installed[@]}"
