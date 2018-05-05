@@ -102,7 +102,7 @@ function verify_archive_link () {
 # 2: Target directory
 function download_archive_package () {
 	local filename="${1}.pkg.tar.xz"
-	local cachedir=$(readlink -e ${2})
+	local cachedir=$(readlink -e "${2}")
 	if [[ -f "${cachedir}/${filename}" ]]; then
 		echo "Hit cache for ${filename}" >&2
 		echo "${2}/${filename}"
