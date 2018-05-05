@@ -94,7 +94,7 @@ function select_archive_link () {
 
 # 1: Package archive link
 function verify_archive_link () {
-	curl -IfLlso /dev/null "${1}" 
+	curl -IfLlso /dev/null "${1}"
 	return $?
 }
 
