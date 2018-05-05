@@ -28,7 +28,7 @@ declare pkgname pkgbase pkgver pkgbuild_sha256sum packager builddir
 # 1: line
 # Return: nothing
 function parse_line () {
-	IFS=$' = ' read key val <<< "${1}"
+	IFS=$' = ' read -r key val <<< "${1}"
 
 	case "${key}" in
 	"format")
