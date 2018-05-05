@@ -347,14 +347,19 @@ cmd_check(){
     msg "Starting build..."
     create_snapshot "build" 0
     build="build"
-    
-    packager=$(buildinfo -f "${pkg}" "packager")
-    builddir=$(buildinfo -f "${pkg}" "builddir")
-    builddate=$(buildinfo -f "${pkg}" "builddate")
-    _pkgver=$(buildinfo -f "${pkg}" "pkgver")
+
+    declare -A buildinfo
+    while IFS=$'=' read key value; do
+        [[ "${key}" = [#!]* ]] || [[ "${key}" = "" ]] || binfo["${key}"]="${value}"
+    done <<< "$(buildinfo -ff "${pkg}")"
+
+    packager="${buildinfo[packager]}"
+    builddir="${buildinfo[builddir]}"
+    builddate="${buildinfo[builddate]}"
+    _pkgver="${buildinfo[pkgver]}"
     # pkgrel=${_pkgver##*-}
     # pkgver=${_pkgver%-*}
-    # pkgbase=$(buildinfo -f "${pkg}" "pkgbase")
+    # pkgbase=${buildinfo[pkgbase]}
     pkgver=20171213
     pkgrel=1
     pkgbase="archlinux-keyring"
