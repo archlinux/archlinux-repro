@@ -111,7 +111,7 @@ function download_archive_package () {
 		local pwd="$(pwd)"
 		local workdir="$(mktemp -d)"
 		local target="$(select_archive_link "${1}")"
-		cd "${workdir}"
+		cd "${workdir}" || exit 1
 		if verify_archive_link "${target}"; then
 			echo "Downloading ${filename}" >&2
 			curl -L "${target}" -o "${filename}" 2>/dev/null
@@ -125,7 +125,7 @@ function download_archive_package () {
 				exit 1
 			fi
 		fi
-		cd "${pwd}"
+		cd "${pwd}" || exit 1
 		rm -r "${workdir}"
 	fi
 }
