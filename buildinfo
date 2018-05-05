@@ -195,7 +195,20 @@ case "${action}" in
 	done
 	;;
 "field")
-    echo -e "${!1}"
+	case "${1}" in
+	"buildenv")
+		echo -e "${buildenv[*]}"
+		;;
+	"options")
+		echo -e "${options[*]}"
+		;;
+	"installed")
+		echo -e "${installed[*]}"
+		;;
+	*)
+	    echo -e "${!1}"
+		;;
+	esac
 	;;
 "field_all")
 	for field in pkgname pkgbase pkgver pkgbuild_sha256sum packager builddate builddir; do
