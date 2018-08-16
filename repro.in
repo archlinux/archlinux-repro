@@ -88,7 +88,6 @@ error() {
 }
 
 
-
 exec_nspawn(){
     local container=$1
     systemd-nspawn -q --as-pid2 --register=no -D "$BUILDDIRECTORY/$container" "${@:2}"
@@ -221,9 +220,6 @@ init_chroot(){
         printf '%s.UTF-8 UTF-8\n' en_US de_DE > "$BUILDDIRECTORY"/root/etc/locale.gen
         printf 'LANG=en_US.UTF-8\n' > "$BUILDDIRECTORY"/root/etc/locale.conf
 
-        echo $makepkg_conf
-        echo $pacman_conf
-
         cp $makepkg_conf "$BUILDDIRECTORY"/root/etc/makepkg.conf
         cp $pacman_conf "$BUILDDIRECTORY"/root/etc/pacman.conf
 
@@ -234,8 +230,7 @@ init_chroot(){
         # exec_nspawn root pacman-key --refresh #&> /dev/bull
         
         msg2 "Updating and installing base & base-devel"
-        exec_nspawn root pacman -Syu --noconfirm --ignore pacman-git
-        exec_nspawn root pacman -S base-devel --noconfirm --ignore pacman-git
+        exec_nspawn root pacman -Syu base-devel --noconfirm
         exec_nspawn root locale-gen
 
         printf 'build ALL = NOPASSWD: /usr/bin/pacman\n' > "$BUILDDIRECTORY"/root/etc/sudoers.d/build-pacman
@@ -248,9 +243,6 @@ mkdir -p /home/build/.gnupg
 echo keyserver-options auto-key-retrieve > /home/build/.gnupg/gpg.conf 
 chown -R build /home/build/.gnupg
 __END__
-
-        msg2 "Installing pacman-git"
-        exec_nspawn root bash -c "yes | pacman -S pacman-git"
         cp $makepkg_conf "$BUILDDIRECTORY"/root/etc/makepkg.conf
         cp $pacman_conf "$BUILDDIRECTORY"/root/etc/pacman.conf
     else
