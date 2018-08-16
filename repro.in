@@ -231,6 +231,7 @@ init_chroot(){
         
         msg2 "Updating and installing base & base-devel"
         exec_nspawn root pacman -Syu base-devel --noconfirm
+        exec_nspawn root pacman -R arch-install-scripts --noconfirm
         exec_nspawn root locale-gen
 
         printf 'build ALL = NOPASSWD: /usr/bin/pacman\n' > "$BUILDDIRECTORY"/root/etc/sudoers.d/build-pacman
@@ -342,36 +343,33 @@ cmd_check(){
 
     declare -A buildinfo
     while IFS=$'=' read key value; do
-        [[ "${key}" = [#!]* ]] || [[ "${key}" = "" ]] || binfo["${key}"]="${value}"
+        [[ "${key}" = [#!]* ]] || [[ "${key}" = "" ]] || buildinfo["${key}"]="${value}"
     done <<< "$(buildinfo -ff "${pkg}")"
-
     packager="${buildinfo[packager]}"
     builddir="${buildinfo[builddir]}"
-    builddate="${buildinfo[builddate]}"
     _pkgver="${buildinfo[pkgver]}"
-    # pkgrel=${_pkgver##*-}
-    # pkgver=${_pkgver%-*}
-    # pkgbase=${buildinfo[pkgbase]}
-    pkgver=20171213
-    pkgrel=1
-    pkgbase="archlinux-keyring"
+    pkgrel=${_pkgver##*-}
+    pkgver=${_pkgver%-*}
+    pkgbase=${buildinfo[pkgbase]}
 
+    SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
+
+    echo "PACKAGER=\"$packager\"" > $BUILDDIRECTORY/build/home/build/.makepkg.conf
 
     # Father I have sinned
     exec_nspawn "build" \
-    bash <<-__END__
+    bash -x  <<-__END__
 shopt -s globstar
-echo PACKAGER="$packager" > /home/build/.makepkg.conf
 mkdir -p $builddir
+chown build:build $builddir
 pacman -S asp --noconfirm
 asp checkout $pkgbase
 cd $pkgbase
-git grep --all-match -e pkgver=$pkgver -e pkgrel=$pkgrel $(git rev-list --all -- repos/) -- repos/ | cut -d: -f1 | head -1 | xargs git checkout
-git grep --all-match -e pkgver=$pkgver -e pkgrel=$pkgrel $(git rev-list --all -- repos/) -- repos/
-echo $pkgver
-echo $pkgrel
-mv -f ./repos/**/PKGBUILD $builddir
-pacman -Rs asp --no-confirm
+history=\$(git grep --all-match -e pkgver=$pkgver -e pkgrel=$pkgrel \$(git rev-list --all -- repos/) -- repos/)
+cut -d: -f1 <<< \$history | head -1 | xargs git checkout
+file_path=\$(cut -d: -f2 <<< \$history | head -1 | xargs dirname)
+mv ./\$file_path/* $builddir
+pacman -Rs asp --noconfirm
 __END__
 
     msg2 "Preparing packages"
@@ -379,7 +377,7 @@ __END__
     mapfile -t packages < <(buildinfo -d "${pkg}" "${cachedir}")
     msg2 "Finished preparing packages"
     msg "Installing packages"
-    exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" pacman -U ${packages[*]}
+    exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" pacman -U ${packages[*]} --noconfirm
 
     build_package "build" $builddir
 }
