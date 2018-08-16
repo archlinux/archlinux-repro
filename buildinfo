@@ -72,30 +72,15 @@ readonly archive_url="https://archive.archlinux.org/packages"
 
 # Desc: get ALA link for given package
 # 1: Package
-# 2: Architecture
-function get_archive_links () {
+function get_archive_link () {
 	local pkg="$(rev <<< "${1}")"
-	local pkgname="$(cut -d'-' -f3- <<< "${pkg}" | rev)"
-
-	echo "${archive_url}/${1:0:1}/${pkgname}/${1}-${2}.pkg.tar.xz"
-}
-
-# 1: Package
-function select_archive_link () {
-	for pkgarch in x86_64 any; do
-		local links="$(get_archive_links "${1}" "${data[pkgarch]}")"
-		for link in ${links}; do
-			if verify_archive_link "${link}"; then
-				echo "${link}"
-				return
-			fi
-		done
-	done
+	local pkgname="$(cut -d'-' -f4- <<< "${pkg}" | rev)"
+	echo "${archive_url}/${1:0:1}/${pkgname}/${1}.pkg.tar.xz"
 }
 
 # 1: Package archive link
 function verify_archive_link () {
-	curl -IfLlso /dev/null "${1}"
+	curl -IfLlso /dev/null "${1}" 
 	return $?
 }
 
@@ -110,7 +95,7 @@ function download_archive_package () {
 	else
 		local pwd="$(pwd)"
 		local workdir="$(mktemp -d)"
-		local target="$(select_archive_link "${1}")"
+		local target="$(get_archive_link "${1}")"
 		cd "${workdir}" || exit 1
 		if verify_archive_link "${target}"; then
 			echo "Downloading ${filename}" >&2
