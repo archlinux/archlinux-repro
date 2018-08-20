@@ -33,14 +33,6 @@ check_root() {
 	fi
 }
 
-is_btrfs() {
-	[[ -e "$1" && "$(stat -f -c %T "$1")" == btrfs ]]
-}
-
-is_subvolume() {
-	[[ -e "$1" && "$(stat -f -c %T "$1")" == btrfs && "$(stat -c %i "$1")" == 256 ]]
-}
-
 colorize() {
 	# prefer terminal safe colored and bold text when tput is supported
 	if tput setaf 0 &>/dev/null; then
