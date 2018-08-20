@@ -205,14 +205,8 @@ init_chroot(){
 
         printf 'builduser ALL = NOPASSWD: /usr/bin/pacman\n' > "$BUILDDIRECTORY"/root/etc/sudoers.d/builduser-pacman
         exec_nspawn root useradd -m -G wheel -s /bin/bash builduser
-
-        exec_nspawn root \
-    bash <<-__END__
-set -e
-mkdir -p /home/builduser/.gnupg
-echo keyserver-options auto-key-retrieve > /home/builduser/.gnupg/gpg.conf
-chown -R builduser /home/builduser/.gnupg
-__END__
+        echo "keyserver-options auto-key-retrieve" | install -Dm644 /dev/stdin "$BUILDDIRECTORY/root"/home/builduser/.gnupg/gpg.conf
+        exec_nspawn root chown -R builduser /home/builduser/.gnupg
         cp $makepkg_conf "$BUILDDIRECTORY"/root/etc/makepkg.conf
         cp $pacman_conf "$BUILDDIRECTORY"/root/etc/pacman.conf
     else
