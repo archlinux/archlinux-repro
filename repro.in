@@ -248,7 +248,7 @@ cmd_check(){
     while IFS=$'=' read key value; do
         [[ "${key}" = [#!]* ]] || [[ "${key}" = "" ]] || buildinfo["${key}"]="${value}"
     done <<< "$(buildinfo -ff "${pkg}")"
-    PACKAGER="${buildinfo[packager]}"
+    packager="${buildinfo[packager]}"
     builddir="${buildinfo[builddir]}"
     _pkgver="${buildinfo[pkgver]}"
     pkgrel=${_pkgver##*-}
@@ -258,7 +258,7 @@ cmd_check(){
     pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
 
-    declare -p PACKAGER > $BUILDDIRECTORY/build/home/build/.makepkg.conf
+    printf 'PACKAGER=' "${PACKAGER@Q}" > $BUILDDIRECTORY/build/home/build/.makepkg.conf
 
     # Father I have sinned
     exec_nspawn "build" \
