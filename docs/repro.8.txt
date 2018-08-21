@@ -34,11 +34,11 @@ Commands
 **build**::
         Builds a package twice and compares sha512 checksums to check for
         reproducability issues. This assumes the current directory contains a
-        PKGBUILD. See linkman:PKGBUILD[5] (This is the default command)   
+        PKGBUILD. See linkman:PKGBUILD[5] (This is the default command)
 
 **check** <package>::
         TBA
-    
+
 
 Options
 -------
@@ -58,6 +58,10 @@ Options
 *-o*::
         Mounts the container inside linkman:disorderfs[1] to create an
         unpredictable filesystem listing.
+
+*-l*::
+        Run check command against a PKGBUILD in the current directory
+        instead of fetching it via asp.
 
 *-C* <file>::
         Specify a linkman:repro.conf[5] file to use for the build container.
