@@ -168,6 +168,13 @@ locale-gen
 __END__
 }
 
+check_pkgbuild() {
+    if [ ! -f PKGBUILD ]; then
+        error "Missing PKGBUILD in the current directory"
+        exit 1
+    fi
+}
+
 build_package(){
     local build=$1
     local builddir=${2:-"/startdir"}
@@ -228,7 +235,7 @@ init_chroot(){
         # exec_nspawn root pacman-key --init #&> /dev/null
         # exec_nspawn root pacman-key --populate archlinux #&> /dev/null
         # exec_nspawn root pacman-key --refresh #&> /dev/bull
-        
+
         msg2 "Updating and installing base & base-devel"
         exec_nspawn root pacman -Syu base-devel --noconfirm
         exec_nspawn root pacman -R arch-install-scripts --noconfirm
@@ -241,7 +248,7 @@ init_chroot(){
     bash <<-__END__
 set -e
 mkdir -p /home/build/.gnupg
-echo keyserver-options auto-key-retrieve > /home/build/.gnupg/gpg.conf 
+echo keyserver-options auto-key-retrieve > /home/build/.gnupg/gpg.conf
 chown -R build /home/build/.gnupg
 __END__
         cp $makepkg_conf "$BUILDDIRECTORY"/root/etc/makepkg.conf
@@ -274,11 +281,11 @@ cmd_build(){
     i=1
     while read line
     do
-        profiles[ $i ]="$line"        
+        profiles[ $i ]="$line"
         (( i++ ))
     done < <(ls $CONFIGDIR/profiles/*.conf | sort -R | tail -$num_builds)
 
-    for build_number in $(seq 1 $num_builds); do 
+    for build_number in $(seq 1 $num_builds); do
         if [ "$user_profile" != "" ]; then
             snapshot_profile=$user_profile
             snapshot_name=${snapshot_profile##*/}
@@ -305,7 +312,7 @@ cmd_build(){
         pkgfile=${pkgfile##*/}
         sha512sum -b ./build1/$pkgfile | read refference_build_checksum _
 
-        for build_number in $(seq 1 $num_builds); do 
+        for build_number in $(seq 1 $num_builds); do
             snapshot_profile=${profiles[$build_number]}
             snapshot_name=${snapshot_profile##*/}
             build_number=$((build_number+1))
@@ -384,19 +391,19 @@ __END__
 
 cmd_help(){
 cat <<__END__
-Usage:   
+Usage:
   repro <command> [options]
 
 Commands:
   check                       Recreate a package file
-  build                       Build a package and test for reproducability 
+  build                       Build a package and test for reproducability
   help                        This help message
 
 General Options:
  -b <num>                     Number of subsequent builds to run with random profiles
  -d                           Run diffoscope if packages are not reproducible
  -p <profile>                 Run builds with a set profile
- -o                           Run tests with disorderfs 
+ -o                           Run tests with disorderfs
  -C <file>                    Specify repro.conf to build with
  -P <file>                    Specify pacman.conf to build with
  -M <file>                    Specify makepkg.conf to build with
@@ -424,7 +431,7 @@ args(){
             *);;
         esac
     done
-    
+
     # Sanity check
     profiles_availabe=$(ls $CONFIGDIR/profiles | wc -l)
     if (( num_builds > profiles_availabe )); then
@@ -436,7 +443,7 @@ args(){
 
 REPRO_CONF=${REPRO_CONF:-$CONFIGDIR/repro.conf}
 if [[ -r $REPRO_CONF ]]; then
-    source $REPRO_CONF 
+    source $REPRO_CONF
 fi
 
 XDG_REPRO_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/repro"
@@ -449,15 +456,18 @@ if [[ "$REPO_CONF" = "$CONFIGDIR/repro.conf" ]]; then
 fi
 
 
-if [ ! -e "$IMGDIRECTORY/$bootstrap_img" ]; then
-    curl -o  "$IMGDIRECTORY/$bootstrap_img" "$BOOTSTRAPMIRROR/$bootstrap_img"
-    curl -o  "$IMGDIRECTORY/$bootstrap_img.sig" "$BOOTSTRAPMIRROR/$bootstrap_img.sig"
-    gpg --verify "$IMGDIRECTORY/$bootstrap_img.sig" "$IMGDIRECTORY/$bootstrap_img"
-fi
+get_bootstrap_img() {
+    if [ ! -e "$IMGDIRECTORY/$bootstrap_img" ]; then
+        msg "Downloading bootstrap image..."
+        curl -o  "$IMGDIRECTORY/$bootstrap_img" "$BOOTSTRAPMIRROR/$bootstrap_img"
+        curl -o  "$IMGDIRECTORY/$bootstrap_img.sig" "$BOOTSTRAPMIRROR/$bootstrap_img.sig"
+        gpg --verify "$IMGDIRECTORY/$bootstrap_img.sig" "$IMGDIRECTORY/$bootstrap_img"
+    fi
+}
 
 case "$1" in
     help) cmd_help "$@" ;;
-    check) shift; args "$@"; init_chroot; cmd_check "$@" ;;
-    build) shift; args "$@"; init_chroot; cmd_build "$@" ;;
-    *) args "$@"; init_chroot; cmd_build "$@" ;;
+    check) shift; args "$@"; get_bootstrap_img; init_chroot; cmd_check "$@" ;;
+    build) shift; args "$@"; check_pkgbuild; get_bootstrap_img; init_chroot; cmd_build "$@" ;;
+    *) args "$@"; check_pkgbuild; get_bootstrap_img; init_chroot; cmd_build "$@" ;;
 esac
