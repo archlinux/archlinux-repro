@@ -372,6 +372,18 @@ __END__
     exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" pacman -U ${packages[*]} --noconfirm
 
     build_package "build" $builddir
+
+    msg "Comparing hashes..."
+    sha512sum -b "$pkg" | read refference_build_checksum _
+    sha512sum -b ./build/"$(basename $pkgfile)" | read other_build_checksum _
+    if [ "$refference_build_checksum" = "$other_build_checksum" ]; then
+      msg "Package is reproducible!"
+    else
+      error "Package is not reproducible"
+      if ((run_diffoscope)); then
+          PYTHONIOENCODING=utf-8 $DIFFOSCOPE "$pkg" ./build/"$(basename $pkg)" || true
+      fi
+    fi
 }
 
 cmd_help(){
