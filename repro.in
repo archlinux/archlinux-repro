@@ -374,8 +374,8 @@ __END__
     build_package "build" $builddir
 
     msg "Comparing hashes..."
-    sha512sum -b "$pkg" | read refference_build_checksum _
-    sha512sum -b ./build/"$(basename $pkgfile)" | read other_build_checksum _
+    read -r refference_build_checksum _ < <(sha512sum -b "$pkg")
+    read -r other_build_checksum _ < <(sha512sum -b ./build/"$(basename $pkgfile)")
     if [ "$refference_build_checksum" = "$other_build_checksum" ]; then
       msg "Package is reproducible!"
     else
