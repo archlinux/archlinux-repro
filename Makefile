@@ -1,6 +1,7 @@
 PROGNM = devtools-repro
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
+SHRDIR ?= $(PREFIX)/share
 DOCDIR ?= $(PREFIX)/share/doc
 MANDIR ?= $(PREFIX)/share/man
 CONFDIR ?= /etc
