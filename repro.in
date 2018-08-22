@@ -324,8 +324,13 @@ cmd_build(){
 cmd_check(){
     local pkg="${1}"
     local cachedir="cache"
-    check_root
 
+    if [[ ! -f "${pkg}" ]]; then
+      error "no pkg.tar.xz given"
+      exit 1
+    fi
+
+    check_root
 
     trap - ERR INT
 
