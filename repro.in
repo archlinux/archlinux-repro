@@ -384,6 +384,7 @@ __END__
     exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" pacman -U ${packages[*]} --noconfirm
 
     build_package "build" $builddir
+    remove_snapshot "build"
 
     msg "Comparing hashes..."
     sha512sum -b "$pkg" | read refference_build_checksum _
