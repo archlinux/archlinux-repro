@@ -169,9 +169,10 @@ check_pkgbuild() {
 
 build_package(){
     local build=$1
-    local builddir=${2:-"/startdir"}
+    local bind_builddir=$2
+    local builddir=${3:-"/build"}
     nspawn_opts=""
-    if [ "$builddir" = "/startdir" ]; then
+    if (( bind_builddir )); then
         nspawn_opts="--bind=$PWD:$builddir"
     fi
     exec_nspawn $build \
@@ -266,7 +267,7 @@ cmd_build(){
     # Build 1 - no disorderfs what so ever
     msg "Starting build1..."
     create_snapshot "build1" 0
-    build_package "build1"
+    build_package "build1" 1
     remove_snapshot "build1"
 
     # Get profiles
@@ -291,7 +292,7 @@ cmd_build(){
         msg "Starting build$build_number..."
         create_snapshot "build$build_number" $run_disorderfs
         set_build_env "build$build_number"
-        build_package "build$build_number"
+        build_package "build$build_number" 1
         remove_snapshot "build$build_number"
     done
 
@@ -361,8 +362,9 @@ cmd_check(){
     echo "PACKAGER=\"$packager\"" > $BUILDDIRECTORY/build/home/build/.makepkg.conf
 
     # Father I have sinned
-    exec_nspawn "build" \
-    bash -x  <<-__END__
+    if (( ! local_pkgbuild )); then
+        exec_nspawn "build" \
+        bash -x  <<-__END__
 shopt -s globstar
 mkdir -p $builddir
 chown build:build $builddir
@@ -375,6 +377,7 @@ file_path=\$(cut -d: -f2 <<< \$history | head -1 | xargs dirname)
 mv ./\$file_path/* $builddir
 pacman -Rs asp --noconfirm
 __END__
+    fi
 
     msg2 "Preparing packages"
     mkdir -p "${cachedir}"
@@ -383,7 +386,7 @@ __END__
     msg "Installing packages"
     exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" pacman -U ${packages[*]} --noconfirm
 
-    build_package "build" $builddir
+    build_package "build" $local_pkgbuild $builddir
     remove_snapshot "build"
 
     msg "Comparing hashes..."
@@ -414,6 +417,7 @@ General Options:
  -d                           Run diffoscope if packages are not reproducible
  -p <profile>                 Run builds with a set profile
  -o                           Run tests with disorderfs
+ -l                           Run check against PKGBUILD in the current directory
  -C <file>                    Specify repro.conf to build with
  -P <file>                    Specify pacman.conf to build with
  -M <file>                    Specify makepkg.conf to build with
@@ -427,9 +431,19 @@ num_builds=1 #We just do two builds as default
 user_profile=""
 run_diffoscope=0
 run_disorderfs=0
+local_pkgbuild=0
+command=""
+command_args=()
 
-args(){
-    while getopts :dob:r:p:C:P:M: arg; do
+args() {
+    # Parse optional command name
+    if [ -n "$1" ] && [ "${1:0:1}" != "-" ]; then
+        command="$1"
+        shift
+    fi
+
+    # Parse repro flags
+    while getopts :dolb:p:C:P:M: arg; do
         case $arg in
             C) REPRO_CONF=$OPTARG;;
             P) pacman_conf=$OPTARG;;
@@ -438,15 +452,24 @@ args(){
             p) user_profile=$OPTARG;;
             d) run_diffoscope=1;;
             o) run_disorderfs=1;;
-            *);;
+            l) local_pkgbuild=1;;
         esac
     done
 
-    # Sanity check
+    # Save command args (such as path to .pkg.tar.xz file)
+    shift $((OPTIND-1))
+    command_args=$@
+}
+
+sanity_check() {
     profiles_availabe=$(ls $CONFIGDIR/profiles | wc -l)
     if (( num_builds > profiles_availabe )); then
         error "Not enough profiles available to run $num_builds builds"
         exit 0
+    fi
+
+    if (( local_pkgbuild )); then
+        check_pkgbuild
     fi
 }
 
@@ -475,9 +498,11 @@ get_bootstrap_img() {
     fi
 }
 
-case "$1" in
+args "$@"
+set -- "${command_args[@]}"
+
+case "$command" in
     help) cmd_help "$@" ;;
-    check) shift; args "$@"; get_bootstrap_img; init_chroot; cmd_check "$@" ;;
-    build) shift; args "$@"; check_pkgbuild; get_bootstrap_img; init_chroot; cmd_build "$@" ;;
-    *) args "$@"; check_pkgbuild; get_bootstrap_img; init_chroot; cmd_build "$@" ;;
+    check) sanity_check; get_bootstrap_img; init_chroot; cmd_check "$@" ;;
+    *) sanity_check; check_pkgbuild; get_bootstrap_img; init_chroot; cmd_build "$@" ;;
 esac
