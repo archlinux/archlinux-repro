@@ -153,8 +153,8 @@ if [[ "${action}" == "" ]]; then
 	exit 1
 fi
 
-declare file="$(readlink -e "${1}")"
-shift 1
+declare file="$(readlink -e "${@: -1}")"
+set -- "${@:1:$(($#-1))}"
 if [[ "${file}" =~ \.pkg ]]; then
 	parse_package "${file}"
 else
