@@ -357,6 +357,7 @@ cmd_check(){
     pkgver=${_pkgver%-*}
     pkgbase=${buildinfo[pkgbase]}
 
+    pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
 
     echo "PACKAGER=\"$packager\"" > $BUILDDIRECTORY/build/home/build/.makepkg.conf
@@ -374,6 +375,12 @@ cd $pkgbase
 history=\$(git grep --all-match -e pkgver=$pkgver -e pkgrel=$pkgrel \$(git rev-list --all -- repos/) -- repos/)
 cut -d: -f1 <<< \$history | head -1 | xargs git checkout
 file_path=\$(cut -d: -f2 <<< \$history | head -1 | xargs dirname)
+pkgbuild_checksum=\$(sha256sum -b \$file_path/PKGBUILD)
+pkgbuild_checksum=\${pkgbuild_checksum%% *}
+if [ \$pkgbuild_checksum != $pkgbuild_sha256sum ]; then
+    # TODO: use warning or exit
+    echo "Warning PKGBUILD checksum does not match"
+fi
 mv ./\$file_path/* $builddir
 pacman -Rs asp --noconfirm
 __END__
