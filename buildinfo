@@ -27,7 +27,6 @@ declare -A data
 
 # Desc: Parses line into current global state
 # 1: line
-# Return: nothing
 function parse_line () {
 	IFS=$' = ' read -r key val <<< "${1}"
 
@@ -78,12 +77,15 @@ function get_archive_link () {
 	echo "${archive_url}/${1:0:1}/${pkgname}/${1}.pkg.tar.xz"
 }
 
+# Desc: check validity of archive URL
 # 1: Package archive link
+# Return: check result
 function verify_archive_link () {
 	curl -IfLlso /dev/null "${1}" 
 	return $?
 }
 
+# Desc: Download package to $2 if not present and check signature using pacman's keyring
 # 1: Package archive link
 # 2: Target directory
 function download_archive_package () {
