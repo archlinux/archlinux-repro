@@ -497,12 +497,17 @@ fi
 
 
 get_bootstrap_img() {
+    trap '{ rm "$IMGDIRECTORY/$bootstrap_img" ; exit 1; }' ERR
     if [ ! -e "$IMGDIRECTORY/$bootstrap_img" ]; then
         msg "Downloading bootstrap image..."
         curl -o  "$IMGDIRECTORY/$bootstrap_img" "$BOOTSTRAPMIRROR/$bootstrap_img"
         curl -o  "$IMGDIRECTORY/$bootstrap_img.sig" "$BOOTSTRAPMIRROR/$bootstrap_img.sig"
-        gpg --verify "$IMGDIRECTORY/$bootstrap_img.sig" "$IMGDIRECTORY/$bootstrap_img"
     fi
+    if ! gpg --verify "$IMGDIRECTORY/$bootstrap_img.sig" "$IMGDIRECTORY/$bootstrap_img"; then
+        error "Can't verify image"
+    fi
+
+    trap - ERR
 }
 
 args "$@"
