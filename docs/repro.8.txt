@@ -15,36 +15,17 @@ Description
 -----------
 'repro' is a script to help with verifying and checking reproducibility of
 packages. It builds a linkman:systemd-nspawn[1] container with the Arch Linux
-bootstrap image to build packages in a clean chroot. It has two modes of
-operation, 'build' and 'check'.
+bootstrap image to build packages in a clean chroot.
 
-'build' assumed a linkman:PKGBUILD[5] in the current directory and attempts to
-build this twice and compares the resulting checksums. 'build' also takes
-profiles (see linkman:repo.profile[5]) to change the build environment when
-doing subsequent builds. These will be compared to the first build to check for
-reproducibility
-
-'check' takes a package as an argument and attempts to recreate the package with
+It takes a package as an argument and attempts to recreate the package with
 the information provided with linkman:BUILDINFO[5]. It will use the Arch Linux
 archive to fetch packages with the correct pkgver.
 
 
-Commands
---------
-**build**::
-        Builds a package twice and compares sha512 checksums to check for
-        reproducability issues. This assumes the current directory contains a
-        PKGBUILD. See linkman:PKGBUILD[5] (This is the default command)
-
-**check** <package>::
-        TBA
-
-
 Options
 -------
-*-b* [number] ::
-        Sets how many subsequent builds should be run with random profiles (see
-        linkman:repro.profile[5]). Defaults to 1.
+*-h*::
+        Print help.
 
 *-d*::
         When enabled linkman:diffoscope[1] is run on the produced packages.
@@ -58,10 +39,6 @@ Options
 *-o*::
         Mounts the container inside linkman:disorderfs[1] to create an
         unpredictable filesystem listing.
-
-*-l*::
-        Run check command against a PKGBUILD in the current directory
-        instead of fetching it via asp.
 
 *-C* <file>::
         Specify a linkman:repro.conf[5] file to use for the build container.
