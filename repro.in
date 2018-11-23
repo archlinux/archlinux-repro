@@ -54,11 +54,6 @@ colorize() {
 }
 colorize
 
-plain() {
-	local mesg=$1; shift
-	printf "${BOLD}    ${mesg}${ALL_OFF}\n" "$@" >&2
-}
-
 msg() {
 	local mesg=$1; shift
 	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
@@ -142,24 +137,6 @@ create_snapshot (){
     touch "$BUILDDIRECTORY/$build"
 }
 
-set_build_env(){
-    local build=$1
-    msg "Settings build environemnt..."
-    exec_nspawn $build \
-    tee /home/build/.bashrc <<-__END__
-export TZ=$TZ
-export LANG=$LANG
-export LC_ALL=$LC_ALL
-__END__
-
-    # Generate locale
-    exec_nspawn $build \
-bash <<-__END__
-echo $LOCALE > /etc/locale.gen
-locale-gen
-__END__
-}
-
 check_pkgbuild() {
     if [ ! -f PKGBUILD ]; then
         error "Missing PKGBUILD in the current directory"
@@ -169,14 +146,8 @@ check_pkgbuild() {
 
 build_package(){
     local build=$1
-    local bind_builddir=$2
-    local builddir=${3:-"/build"}
-    nspawn_opts=""
-    if (( bind_builddir )); then
-        nspawn_opts="--bind=$PWD:$builddir"
-    fi
+    local builddir=${2:-"/build"}
     exec_nspawn $build \
-        $nspawn_opts \
         --bind="$PWD:/srcdest" \
 bash <<-__END__
 set -e
@@ -256,79 +227,6 @@ __END__
     trap - ERR INT
 }
 
-cmd_build(){
-    shopt -s lastpipe
-
-    check_root
-
-    SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(date +%s)}
-    msg "Using SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
-
-    # Build 1 - no disorderfs what so ever
-    msg "Starting build1..."
-    create_snapshot "build1" 0
-    build_package "build1" 1
-    remove_snapshot "build1"
-
-    # Get profiles
-    i=1
-    while read line
-    do
-        profiles[ $i ]="$line"
-        (( i++ ))
-    done < <(ls $CONFIGDIR/profiles/*.conf | sort -R | tail -$num_builds)
-
-    for build_number in $(seq 1 $num_builds); do
-        if [ "$user_profile" != "" ]; then
-            snapshot_profile=$user_profile
-            snapshot_name=${snapshot_profile##*/}
-        else
-            snapshot_profile=${profiles[$build_number]}
-            snapshot_name=${snapshot_profile##*/}
-        fi
-        msg "Using profile: " $snapshot_name
-        source $snapshot_profile
-        build_number=$((build_number+1))
-        msg "Starting build$build_number..."
-        create_snapshot "build$build_number" $run_disorderfs
-        set_build_env "build$build_number"
-        build_package "build$build_number" 1
-        remove_snapshot "build$build_number"
-    done
-
-    # Remove traps so we don't accidental an rm -rf
-    trap - ERR INT
-
-    msg "Comparing hashes..."
-    is_error=false
-    for pkgfile in ./build1/*; do
-        pkgfile=${pkgfile##*/}
-        sha512sum -b ./build1/$pkgfile | read refference_build_checksum _
-
-        for build_number in $(seq 1 $num_builds); do
-            snapshot_profile=${profiles[$build_number]}
-            snapshot_name=${snapshot_profile##*/}
-            build_number=$((build_number+1))
-            sha512sum -b ./build$build_number/$pkgfile | read other_build_checksum _
-            if [ "$refference_build_checksum" = "$other_build_checksum" ]; then
-              msg2 "$pkgfile from build$build_number is reproducible with $snapshot_name!"
-            else
-              warning "$pkgfile from build$build_number is not reproducible with $snapshot_name!"
-              if ((run_diffoscope)); then
-                  PYTHONIOENCODING=utf-8 $DIFFOSCOPE ./build1/$pkgfile ./build$build_number/$pkgfile || true
-              fi
-              is_error=true
-            fi
-        done
-    done
-
-    if $is_error; then
-        error "Package is not reproducible"
-    else
-        msg "Package is reproducible!"
-    fi
-}
-
 cmd_check(){
     local pkg="${1}"
     local cachedir="cache"
@@ -363,9 +261,8 @@ cmd_check(){
     echo "PACKAGER=\"$packager\"" > $BUILDDIRECTORY/build/home/build/.makepkg.conf
 
     # Father I have sinned
-    if (( ! local_pkgbuild )); then
-        exec_nspawn "build" \
-        bash -x  <<-__END__
+    exec_nspawn "build" \
+    bash -x  <<-__END__
 shopt -s globstar
 mkdir -p $builddir
 chown build:build $builddir
@@ -384,7 +281,6 @@ fi
 mv ./\$file_path/* $builddir
 pacman -Rs asp --noconfirm
 __END__
-    fi
 
     msg2 "Preparing packages"
     mkdir -p "${cachedir}"
@@ -393,7 +289,7 @@ __END__
     msg "Installing packages"
     exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" pacman -U ${packages[*]} --noconfirm
 
-    build_package "build" $local_pkgbuild $builddir
+    build_package "build" $builddir
     remove_snapshot "build"
 
     msg "Comparing hashes..."
@@ -409,22 +305,16 @@ __END__
     fi
 }
 
-cmd_help(){
+print_help() {
 cat <<__END__
 Usage:
-  repro <command> [options]
-
-Commands:
-  check                       Recreate a package file
-  build                       Build a package and test for reproducability
-  help                        This help message
+  repro [options]
 
 General Options:
- -b <num>                     Number of subsequent builds to run with random profiles
+ -h                           Print this help message
  -d                           Run diffoscope if packages are not reproducible
  -p <profile>                 Run builds with a set profile
  -o                           Run tests with disorderfs
- -l                           Run check against PKGBUILD in the current directory
  -C <file>                    Specify repro.conf to build with
  -P <file>                    Specify pacman.conf to build with
  -M <file>                    Specify makepkg.conf to build with
@@ -434,32 +324,22 @@ __END__
 # Default options
 pacman_conf=$CONFIGDIR/pacman.conf
 makepkg_conf=$CONFIGDIR/makepkg.conf
-num_builds=1 #We just do two builds as default
 user_profile=""
 run_diffoscope=0
 run_disorderfs=0
-local_pkgbuild=0
-command=""
 command_args=()
 
 args() {
-    # Parse optional command name
-    if [ -n "$1" ] && [ "${1:0:1}" != "-" ]; then
-        command="$1"
-        shift
-    fi
-
     # Parse repro flags
-    while getopts :dolb:p:C:P:M: arg; do
+    while getopts :hdop:C:P:M: arg; do
         case $arg in
+            h) print_help; exit 0;;
             C) REPRO_CONF=$OPTARG;;
             P) pacman_conf=$OPTARG;;
             M) makepkg_conf=$OPTARG;;
-            b) num_builds=$OPTARG;;
             p) user_profile=$OPTARG;;
             d) run_diffoscope=1;;
             o) run_disorderfs=1;;
-            l) local_pkgbuild=1;;
         esac
     done
 
@@ -467,19 +347,6 @@ args() {
     shift $((OPTIND-1))
     command_args=$@
 }
-
-sanity_check() {
-    profiles_availabe=$(ls $CONFIGDIR/profiles | wc -l)
-    if (( num_builds > profiles_availabe )); then
-        error "Not enough profiles available to run $num_builds builds"
-        exit 0
-    fi
-
-    if (( local_pkgbuild )); then
-        check_pkgbuild
-    fi
-}
-
 
 REPRO_CONF=${REPRO_CONF:-$CONFIGDIR/repro.conf}
 if [[ -r $REPRO_CONF ]]; then
@@ -512,9 +379,6 @@ get_bootstrap_img() {
 
 args "$@"
 set -- "${command_args[@]}"
-
-case "$command" in
-    help) cmd_help "$@" ;;
-    check) sanity_check; get_bootstrap_img; init_chroot; cmd_check "$@" ;;
-    *) sanity_check; check_pkgbuild; get_bootstrap_img; init_chroot; cmd_build "$@" ;;
-esac
+get_bootstrap_img
+init_chroot
+cmd_check "$@"
