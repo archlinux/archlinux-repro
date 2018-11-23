@@ -151,13 +151,11 @@ build_package(){
         --bind="$PWD:/srcdest" \
 bash <<-__END__
 set -e
-mkdir -p /pkgdest
-chown build:build /pkgdest
-mkdir -p /srcpkgdest
-chown build:build /srcpkgdest
-mkdir -p $builddir || true
+install -d -o builduser -g builduser /pkgdest
+install -d -o builduser -g builduser /srcpkgdest
+mkdir -p $builddir
 cd $builddir
-sudo -u build SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg -sc --noconfirm
+sudo -u builduser SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg -sc --noconfirm
 __END__
     mkdir -p "./$build"
     for pkgfile in "$BUILDDIRECTORY/$build"/pkgdest/*; do
@@ -205,16 +203,10 @@ init_chroot(){
         exec_nspawn root pacman -R arch-install-scripts --noconfirm
         exec_nspawn root locale-gen
 
-        printf 'build ALL = NOPASSWD: /usr/bin/pacman\n' > "$BUILDDIRECTORY"/root/etc/sudoers.d/build-pacman
-        exec_nspawn root useradd -m -G wheel -s /bin/bash build
-
-        exec_nspawn root \
-    bash <<-__END__
-set -e
-mkdir -p /home/build/.gnupg
-echo keyserver-options auto-key-retrieve > /home/build/.gnupg/gpg.conf
-chown -R build /home/build/.gnupg
-__END__
+        printf 'builduser ALL = NOPASSWD: /usr/bin/pacman\n' > "$BUILDDIRECTORY"/root/etc/sudoers.d/builduser-pacman
+        exec_nspawn root useradd -m -G wheel -s /bin/bash builduser
+        echo "keyserver-options auto-key-retrieve" | install -Dm644 /dev/stdin "$BUILDDIRECTORY/root"/home/builduser/.gnupg/gpg.conf
+        exec_nspawn root chown -R builduser /home/builduser/.gnupg
         cp $makepkg_conf "$BUILDDIRECTORY"/root/etc/makepkg.conf
         cp $pacman_conf "$BUILDDIRECTORY"/root/etc/pacman.conf
     else
@@ -258,14 +250,14 @@ cmd_check(){
     pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
 
-    echo "PACKAGER=\"$packager\"" > $BUILDDIRECTORY/build/home/build/.makepkg.conf
+    printf 'PACKAGER=' "${PACKAGER@Q}" > $BUILDDIRECTORY/build/home/builduser/.makepkg.conf
 
     # Father I have sinned
     exec_nspawn "build" \
     bash -x  <<-__END__
 shopt -s globstar
 mkdir -p $builddir
-chown build:build $builddir
+chown builduser:builduser $builddir
 pacman -S asp --noconfirm
 asp checkout $pkgbase
 cd $pkgbase
