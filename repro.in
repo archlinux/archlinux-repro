@@ -313,7 +313,6 @@ Usage:
 General Options:
  -h                           Print this help message
  -d                           Run diffoscope if packages are not reproducible
- -p <profile>                 Run builds with a set profile
  -o                           Run tests with disorderfs
  -C <file>                    Specify repro.conf to build with
  -P <file>                    Specify pacman.conf to build with
@@ -324,20 +323,18 @@ __END__
 # Default options
 pacman_conf=$CONFIGDIR/pacman.conf
 makepkg_conf=$CONFIGDIR/makepkg.conf
-user_profile=""
 run_diffoscope=0
 run_disorderfs=0
 command_args=()
 
 args() {
     # Parse repro flags
-    while getopts :hdop:C:P:M: arg; do
+    while getopts :hdoC:P:M: arg; do
         case $arg in
             h) print_help; exit 0;;
             C) REPRO_CONF=$OPTARG;;
             P) pacman_conf=$OPTARG;;
             M) makepkg_conf=$OPTARG;;
-            p) user_profile=$OPTARG;;
             d) run_diffoscope=1;;
             o) run_disorderfs=1;;
         esac
