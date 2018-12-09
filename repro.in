@@ -17,11 +17,6 @@ mkdir -p $IMGDIRECTORY
 
 DIFFOSCOPE="diffoscope"
 
-#Disorderfs defaults
-DISORDERFS_SHUFFLE_DIRENTS=no
-DISORDERFS_REVERSE_DIRENTS=yes
-DISORDERFS_SORT_DIRENTS=no
-
 # Desc: Escalates privileges
 orig_argv=("$0" "$@")
 src_owner=${SUDO_USER:-$USER}
@@ -103,53 +98,24 @@ function cleanup_root_volume(){
 function remove_snapshot (){
     local build=$1
     msg2 "Delete snapshot for $build..."
-    if ((run_disorderfs)); then
-        umount "$BUILDDIRECTORY/$build" || true
-        umount "$BUILDDIRECTORY/${build}_disorder" || true
-    else
-        umount "$BUILDDIRECTORY/$build" || true
-    fi
-    rm -rf "${BUILDDIRECTORY:?}/{${build},${build}_upperdir,${build}_workdir,${build}_disorder}" || true
+    umount "$BUILDDIRECTORY/$build" || true
+    rm -rf "${BUILDDIRECTORY:?}/{${build},${build}_upperdir,${build}_workdir}"
     trap - ERR INT
 }
 
 # Desc: Creates a snapshot of the root container
 # 1: name of container
-# 2: disorderfs; 0 -> false, 1 -> true
 function create_snapshot (){
     local build=$1
-    local disorderfs=$2
 
     trap '{ remove_snapshot $build ; exit 1; }' ERR INT
 
     msg2 "Create snapshot for $build..."
     mkdir -p "$BUILDDIRECTORY/"{"${build}","${build}_upperdir","${build}_workdir"}
-
-    if ((disorderfs)); then
-        # The idea is that instead of mounting overlayfs on $build when we want disorderfs, we mount it on
-        # ${build}_disorder so other functions dont have to care for the difference
-
-        mkdir "$BUILDDIRECTORY/${build}_disorder"
-        # shellcheck disable=SC2140
-        mount -t overlay overlay \
-            -o lowerdir="$BUILDDIRECTORY/root",upperdir="$BUILDDIRECTORY/${build}_upperdir",workdir="$BUILDDIRECTORY/${build}_workdir" \
-            "$BUILDDIRECTORY/${build}_disorder"
-        msg "Using disorderfs settings..."
-        disorderfs \
-            --multi-user=yes \
-            --shuffle-dirents=$DISORDERFS_SHUFFLE_DIRENTS \
-            --reverse-dirents=$DISORDERFS_REVERSE_DIRENTS \
-            --sort-dirents=$DISORDERFS_SORT_DIRENTS \
-            "$BUILDDIRECTORY/${build}_disorder" "$BUILDDIRECTORY/${build}"
-        # msg2 "--shuffle-dirents $DISORDERFS_SHUFFLE_DIRENTS"
-        # msg2 "--reverse-dirents $DISORDERFS_REVERSE_DIRENTS"
-        # msg2 "--sort-dirents $DISORDERFS_SORT_DIRENTS"
-    else
-        # shellcheck disable=SC2140
-        mount -t overlay overlay \
-            -o lowerdir="$BUILDDIRECTORY/root",upperdir="$BUILDDIRECTORY/${build}_upperdir",workdir="$BUILDDIRECTORY/${build}_workdir" \
-            "$BUILDDIRECTORY/${build}"
-    fi
+    # shellcheck disable=SC2140
+    mount -t overlay overlay \
+        -o lowerdir="$BUILDDIRECTORY/root",upperdir="$BUILDDIRECTORY/${build}_upperdir",workdir="$BUILDDIRECTORY/${build}_workdir" \
+        "$BUILDDIRECTORY/${build}"
     touch "$BUILDDIRECTORY/$build"
 }
 
@@ -331,8 +297,6 @@ Usage:
 General Options:
  -h                           Print this help message
  -d                           Run diffoscope if packages are not reproducible
- -o                           Run tests with disorderfs
- -C <file>                    Specify repro.conf to build with
  -P <file>                    Specify pacman.conf to build with
  -M <file>                    Specify makepkg.conf to build with
 __END__
@@ -344,34 +308,14 @@ hash buildinfo 2>/dev/null || { error "Require buildinfo in path! Aborting..."; 
 pacman_conf=$CONFIGDIR/pacman.conf
 makepkg_conf=$CONFIGDIR/makepkg.conf
 run_diffoscope=0
-run_disorderfs=0
 command_args=()
-
-REPRO_CONF=${REPRO_CONF:-$CONFIGDIR/repro.conf}
-if [[ -r $REPRO_CONF ]]; then
-    # shellcheck source=/dev/null
-    source "$REPRO_CONF"
-fi
-
-XDG_REPRO_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/repro"
-if [[ "$REPRO_CONF" = "$CONFIGDIR/repro.conf" ]]; then
-    if [[ -r "$XDG_REPRO_DIR/repro.conf" ]]; then
-        # shellcheck source=/dev/null
-        source "$XDG_REPRO_DIR/repro.conf"
-    elif [[ -r "$HOME/.repro.conf" ]]; then
-        # shellcheck source=/dev/null
-        source "$HOME/.repro.conf"
-    fi
-fi
 
 while getopts :hdoC:P:M: arg; do
     case $arg in
         h) print_help; exit 0;;
-        C) REPRO_CONF=$OPTARG;;
         P) pacman_conf=$OPTARG;;
         M) makepkg_conf=$OPTARG;;
         d) run_diffoscope=1;;
-        o) run_disorderfs=1;;
         *) ;;
     esac
 done

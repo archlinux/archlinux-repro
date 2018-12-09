@@ -32,27 +32,12 @@ Options
         `DIFFOSCOPE` can be set in linkman:repro.conf[5] to change the
         diffoscope command.
 
-*-o*::
-        Mounts the container inside linkman:disorderfs[1] to create an
-        unpredictable filesystem listing.
-
-*-C* <file>::
-        Specify a linkman:repro.conf[5] file to use for the build container.
-
 *-P* <file>::
         Specify a linkman:pacman.conf[5] file to use for the build container.
 
 *-M* <file>::
         Specify a linkman:makepkg.conf[5] file to use for the build container.
 
-
-Configuration
--------------
-See linkman:repro.conf[5] for more details on configuring repro using the
-'repro.conf' file.
-
-
 See Also
 --------
-linkman:repro.conf[5], linkman:repro.profile[5], linkman:makepkg[8],
-linkman:pacman.conf[5], linkman:makepkg.conf[5], linkman:disorderfs[1]
+linkman:makepkg[8], linkman:pacman.conf[5], linkman:makepkg.conf[5]
