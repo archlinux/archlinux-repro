@@ -322,6 +322,8 @@ General Options:
 __END__
 }
 
+hash buildinfo 2>/dev/null || { error "Require buildinfo in path! Aborting..."; exit 1; }
+
 # Default options
 pacman_conf=$CONFIGDIR/pacman.conf
 makepkg_conf=$CONFIGDIR/makepkg.conf
