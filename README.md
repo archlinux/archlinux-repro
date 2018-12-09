@@ -10,3 +10,11 @@ The current goals are:
 - Distribution independent. One should be able to verify Arch packages on Debian.
 
 Work in progress. Please read the code before using.
+
+## Dependencies
+
+* asciidoc (make)
+* coreutils
+* curl
+* gnupg
+* systemd
