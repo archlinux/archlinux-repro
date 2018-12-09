@@ -307,7 +307,23 @@ __END__
     fi
 }
 
-print_help() {
+# Desc: Fetches a bootstrap image and verifies the signature
+function get_bootstrap_img() {
+    trap '{ rm "$IMGDIRECTORY/$bootstrap_img" ; exit 1; }' ERR
+    if [ ! -e "$IMGDIRECTORY/$bootstrap_img" ]; then
+        msg "Downloading bootstrap image..."
+        curl -o  "$IMGDIRECTORY/$bootstrap_img" "$BOOTSTRAPMIRROR/$bootstrap_img"
+        curl -o  "$IMGDIRECTORY/$bootstrap_img.sig" "$BOOTSTRAPMIRROR/$bootstrap_img.sig"
+        if ! gpg --verify "$IMGDIRECTORY/$bootstrap_img.sig" "$IMGDIRECTORY/$bootstrap_img"; then
+            error "Can't verify image"
+            exit 1
+        fi
+    fi
+    trap - ERR
+}
+
+# Desc: Prints the help section
+function print_help() {
 cat <<__END__
 Usage:
   repro [options]
@@ -331,27 +347,10 @@ run_diffoscope=0
 run_disorderfs=0
 command_args=()
 
-args() {
-    # Parse repro flags
-    while getopts :hdoC:P:M: arg; do
-        case $arg in
-            h) print_help; exit 0;;
-            C) REPRO_CONF=$OPTARG;;
-            P) pacman_conf=$OPTARG;;
-            M) makepkg_conf=$OPTARG;;
-            d) run_diffoscope=1;;
-            o) run_disorderfs=1;;
-        esac
-    done
-
-    # Save command args (such as path to .pkg.tar.xz file)
-    shift $((OPTIND-1))
-    command_args=$@
-}
-
 REPRO_CONF=${REPRO_CONF:-$CONFIGDIR/repro.conf}
 if [[ -r $REPRO_CONF ]]; then
-    source $REPRO_CONF
+    # shellcheck source=/dev/null
+    source "$REPRO_CONF"
 fi
 
 XDG_REPRO_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/repro"
@@ -365,22 +364,23 @@ if [[ "$REPRO_CONF" = "$CONFIGDIR/repro.conf" ]]; then
     fi
 fi
 
+while getopts :hdoC:P:M: arg; do
+    case $arg in
+        h) print_help; exit 0;;
+        C) REPRO_CONF=$OPTARG;;
+        P) pacman_conf=$OPTARG;;
+        M) makepkg_conf=$OPTARG;;
+        d) run_diffoscope=1;;
+        o) run_disorderfs=1;;
+        *) ;;
+    esac
+done
 
-get_bootstrap_img() {
-    trap '{ rm "$IMGDIRECTORY/$bootstrap_img" ; exit 1; }' ERR
-    if [ ! -e "$IMGDIRECTORY/$bootstrap_img" ]; then
-        msg "Downloading bootstrap image..."
-        curl -o  "$IMGDIRECTORY/$bootstrap_img" "$BOOTSTRAPMIRROR/$bootstrap_img"
-        curl -o  "$IMGDIRECTORY/$bootstrap_img.sig" "$BOOTSTRAPMIRROR/$bootstrap_img.sig"
-    fi
-    if ! gpg --verify "$IMGDIRECTORY/$bootstrap_img.sig" "$IMGDIRECTORY/$bootstrap_img"; then
-        error "Can't verify image"
-    fi
+# Save command args (such as path to .pkg.tar.xz file)
+shift $((OPTIND-1))
+# shellcheck disable=SC2178
+command_args="$*"
 
-    trap - ERR
-}
-
-args "$@"
 set -- "${command_args[@]}"
 get_bootstrap_img
 check_root
