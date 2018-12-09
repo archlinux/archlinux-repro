@@ -180,8 +180,6 @@ __END__
 function init_chroot(){
     set -e
 
-    check_root
-
     if [ ! -d "$BUILDDIRECTORY" ]; then
         mkdir -p $BUILDDIRECTORY
     fi
@@ -242,8 +240,6 @@ function cmd_check(){
       error "no pkg.tar.xz given"
       exit 1
     fi
-
-    check_root
 
     trap - ERR INT
 
@@ -387,5 +383,6 @@ get_bootstrap_img() {
 args "$@"
 set -- "${command_args[@]}"
 get_bootstrap_img
+check_root
 init_chroot
 cmd_check "$@"
