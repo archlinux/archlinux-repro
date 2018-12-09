@@ -287,7 +287,7 @@ __END__
 
     msg2 "Preparing packages"
     mkdir -p "${cachedir}"
-    mapfile -t packages < <(buildinfo -d "${pkg}" "${cachedir}")
+    mapfile -t packages < <(buildinfo -d "${cachedir}" "${pkg}")
     msg2 "Finished preparing packages"
     msg "Installing packages"
     # shellcheck disable=SC2086
