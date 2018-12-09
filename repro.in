@@ -22,9 +22,10 @@ DISORDERFS_SHUFFLE_DIRENTS=no
 DISORDERFS_REVERSE_DIRENTS=yes
 DISORDERFS_SORT_DIRENTS=no
 
+# Desc: Escalates privileges
 orig_argv=("$0" "$@")
 src_owner=${SUDO_USER:-$USER}
-check_root() {
+function check_root() {
 	(( EUID == 0 )) && return
 	if type -P sudo >/dev/null; then
 		exec sudo -- "${orig_argv[@]}"
@@ -33,7 +34,8 @@ check_root() {
 	fi
 }
 
-colorize() {
+# Desc: Sets the appropriate colors for output
+function colorize() {
 	# prefer terminal safe colored and bold text when tput is supported
 	if tput setaf 0 &>/dev/null; then
 		ALL_OFF="$(tput sgr0)"
@@ -54,39 +56,51 @@ colorize() {
 }
 colorize
 
-msg() {
+# Desc: Message format
+function msg() {
 	local mesg=$1; shift
+    # shellcheck disable=SC2059
 	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
-msg2() {
+# Desc: Sub-message format
+function msg2() {
 	local mesg=$1; shift
+    # shellcheck disable=SC2059
 	printf "${BLUE}  ->${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
-warning() {
+# Desc: Warning format
+function warning() {
 	local mesg=$1; shift
+    # shellcheck disable=SC2059
 	printf "${YELLOW}==> $(gettext "WARNING:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
-error() {
+# Desc: Error format
+function error() {
 	local mesg=$1; shift
+    # shellcheck disable=SC2059
 	printf "${RED}==> $(gettext "ERROR:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
-
-exec_nspawn(){
+# Desc: Executes an command inside a given nspawn container
+# 1: Container name
+# 2: Command to execute
+function exec_nspawn(){
     local container=$1
     systemd-nspawn -q --as-pid2 --register=no -D "$BUILDDIRECTORY/$container" "${@:2}"
 }
 
-cleanup_root_volume(){
+# Desc: Removes the root container
+function cleanup_root_volume(){
     warning "Removing root container..."
     rm -rf "$BUILDDIRECTORY/root"
 }
 
-# $1 -> name of container
-remove_snapshot (){
+# Desc: Removes a given snapshot
+# 1: Snapshot name
+function remove_snapshot (){
     local build=$1
     msg2 "Delete snapshot for $build..."
     if ((run_disorderfs)); then
@@ -95,27 +109,28 @@ remove_snapshot (){
     else
         umount "$BUILDDIRECTORY/$build" || true
     fi
-    rm -rf "$BUILDDIRECTORY"/{${build},${build}_upperdir,${build}_workdir,${build}_disorder} || true
+    rm -rf "${BUILDDIRECTORY:?}/{${build},${build}_upperdir,${build}_workdir,${build}_disorder}" || true
     trap - ERR INT
 }
 
-# $1 -> name of container
-# $2 -> disorderfs; 0 -> false, 1 -> true
-create_snapshot (){
+# Desc: Creates a snapshot of the root container
+# 1: name of container
+# 2: disorderfs; 0 -> false, 1 -> true
+function create_snapshot (){
     local build=$1
     local disorderfs=$2
 
-    trap '{ remove_snapshot $build ; exit 1; }' ERR
-    trap '{ remove_snapshot $build ; trap - INT; kill -INT $$; }' INT
+    trap '{ remove_snapshot $build ; exit 1; }' ERR INT
 
     msg2 "Create snapshot for $build..."
-    mkdir -p "$BUILDDIRECTORY"/{${build},${build}_upperdir,${build}_workdir}
+    mkdir -p "$BUILDDIRECTORY/"{"${build}","${build}_upperdir","${build}_workdir"}
 
     if ((disorderfs)); then
         # The idea is that instead of mounting overlayfs on $build when we want disorderfs, we mount it on
         # ${build}_disorder so other functions dont have to care for the difference
 
         mkdir "$BUILDDIRECTORY/${build}_disorder"
+        # shellcheck disable=SC2140
         mount -t overlay overlay \
             -o lowerdir="$BUILDDIRECTORY/root",upperdir="$BUILDDIRECTORY/${build}_upperdir",workdir="$BUILDDIRECTORY/${build}_workdir" \
             "$BUILDDIRECTORY/${build}_disorder"
@@ -130,6 +145,7 @@ create_snapshot (){
         # msg2 "--reverse-dirents $DISORDERFS_REVERSE_DIRENTS"
         # msg2 "--sort-dirents $DISORDERFS_SORT_DIRENTS"
     else
+        # shellcheck disable=SC2140
         mount -t overlay overlay \
             -o lowerdir="$BUILDDIRECTORY/root",upperdir="$BUILDDIRECTORY/${build}_upperdir",workdir="$BUILDDIRECTORY/${build}_workdir" \
             "$BUILDDIRECTORY/${build}"
@@ -137,17 +153,13 @@ create_snapshot (){
     touch "$BUILDDIRECTORY/$build"
 }
 
-check_pkgbuild() {
-    if [ ! -f PKGBUILD ]; then
-        error "Missing PKGBUILD in the current directory"
-        exit 1
-    fi
-}
-
-build_package(){
+# Desc: Build a package inside a container
+# 1: Container name
+# 2: Container buildpath
+function build_package(){
     local build=$1
     local builddir=${2:-"/build"}
-    exec_nspawn $build \
+    exec_nspawn "$build" \
         --bind="$PWD:/srcdest" \
 bash <<-__END__
 set -e
@@ -164,7 +176,8 @@ __END__
     chown -R "$src_owner" "./$build"
 }
 
-init_chroot(){
+# Desc: Sets up a container with the correct files
+function init_chroot(){
     set -e
 
     check_root
@@ -189,8 +202,8 @@ init_chroot(){
         printf '%s.UTF-8 UTF-8\n' en_US de_DE > "$BUILDDIRECTORY"/root/etc/locale.gen
         printf 'LANG=en_US.UTF-8\n' > "$BUILDDIRECTORY"/root/etc/locale.conf
 
-        cp $makepkg_conf "$BUILDDIRECTORY"/root/etc/makepkg.conf
-        cp $pacman_conf "$BUILDDIRECTORY"/root/etc/pacman.conf
+        cp "$makepkg_conf" "$BUILDDIRECTORY"/root/etc/makepkg.conf
+        cp "$pacman_conf" "$BUILDDIRECTORY"/root/etc/pacman.conf
 
         systemd-machine-id-setup --root="$BUILDDIRECTORY"/root
         msg2 "Setting up keyring, this might take a while..."
@@ -207,19 +220,21 @@ init_chroot(){
         exec_nspawn root useradd -m -G wheel -s /bin/bash builduser
         echo "keyserver-options auto-key-retrieve" | install -Dm644 /dev/stdin "$BUILDDIRECTORY/root"/home/builduser/.gnupg/gpg.conf
         exec_nspawn root chown -R builduser /home/builduser/.gnupg
-        cp $makepkg_conf "$BUILDDIRECTORY"/root/etc/makepkg.conf
-        cp $pacman_conf "$BUILDDIRECTORY"/root/etc/pacman.conf
+        cp "$makepkg_conf" "$BUILDDIRECTORY"/root/etc/makepkg.conf
+        cp "$pacman_conf" "$BUILDDIRECTORY"/root/etc/pacman.conf
     else
         printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
-        cp $makepkg_conf "$BUILDDIRECTORY"/root/etc/makepkg.conf
-        cp $pacman_conf "$BUILDDIRECTORY"/root/etc/pacman.conf
+        cp "$makepkg_conf" "$BUILDDIRECTORY"/root/etc/makepkg.conf
+        cp "$pacman_conf" "$BUILDDIRECTORY"/root/etc/pacman.conf
         exec_nspawn root pacman -Syu --noconfirm
     fi
 
     trap - ERR INT
 }
 
-cmd_check(){
+# Desc: Reproduces a package
+# 1: Location of package
+function cmd_check(){
     local pkg="${1}"
     local cachedir="cache"
 
@@ -237,7 +252,7 @@ cmd_check(){
     build="build"
 
     declare -A buildinfo
-    while IFS=$'=' read key value; do
+    while IFS=$'=' read -r key value; do
         [[ "${key}" = [#!]* ]] || [[ "${key}" = "" ]] || buildinfo["${key}"]="${value}"
     done <<< "$(buildinfo -ff "${pkg}")"
     packager="${buildinfo[packager]}"
@@ -250,7 +265,7 @@ cmd_check(){
     pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
 
-    printf 'PACKAGER=' "${PACKAGER@Q}" > $BUILDDIRECTORY/build/home/builduser/.makepkg.conf
+    printf 'PACKAGER=%s' "${packager@Q}" > "$BUILDDIRECTORY/build/home/builduser/.makepkg.conf"
 
     # Father I have sinned
     exec_nspawn "build" \
@@ -279,9 +294,10 @@ __END__
     mapfile -t packages < <(buildinfo -d "${pkg}" "${cachedir}")
     msg2 "Finished preparing packages"
     msg "Installing packages"
+    # shellcheck disable=SC2086
     exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" pacman -U ${packages[*]} --noconfirm
 
-    build_package "build" $builddir
+    build_package "build" "$builddir"
     remove_snapshot "build"
 
     msg "Comparing hashes..."
@@ -292,7 +308,7 @@ __END__
     else
       error "Package is not reproducible"
       if ((run_diffoscope)); then
-          PYTHONIOENCODING=utf-8 $DIFFOSCOPE "$pkg" ./build/"$(basename $pkg)" || true
+          PYTHONIOENCODING=utf-8 $DIFFOSCOPE "$pkg" ./build/"$(basename "$pkg")" || true
       fi
     fi
 }
@@ -343,10 +359,12 @@ if [[ -r $REPRO_CONF ]]; then
 fi
 
 XDG_REPRO_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/repro"
-if [[ "$REPO_CONF" = "$CONFIGDIR/repro.conf" ]]; then
+if [[ "$REPRO_CONF" = "$CONFIGDIR/repro.conf" ]]; then
     if [[ -r "$XDG_REPRO_DIR/repro.conf" ]]; then
+        # shellcheck source=/dev/null
         source "$XDG_REPRO_DIR/repro.conf"
     elif [[ -r "$HOME/.repro.conf" ]]; then
+        # shellcheck source=/dev/null
         source "$HOME/.repro.conf"
     fi
 fi
