@@ -84,7 +84,7 @@ function error() {
 # 2: Command to execute
 function exec_nspawn(){
     local container=$1
-    systemd-nspawn -q --as-pid2 --register=no -D "$BUILDDIRECTORY/$container" "${@:2}"
+    systemd-nspawn -q --as-pid2 --register=no --pipe -D "$BUILDDIRECTORY/$container" "${@:2}"
 }
 
 # Desc: Removes the root container
