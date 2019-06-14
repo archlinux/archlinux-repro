@@ -257,9 +257,8 @@ __END__
     msg2 "Finished preparing packages"
     msg "Installing packages"
     # shellcheck disable=SC2086
-    exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" bash -x  <<-__END__
-yes | pacman -U ${packages[*]}
-__END__
+    exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" bash -c \
+        'yes y | pacman -U -- "$@"' -bash "${packages[@]}"
 
     build_package "build" "$builddir"
     remove_snapshot "build"
