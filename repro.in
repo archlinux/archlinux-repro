@@ -99,7 +99,9 @@ function remove_snapshot (){
     local build=$1
     msg2 "Delete snapshot for $build..."
     umount "$BUILDDIRECTORY/$build" || true
-    rm -rf "${BUILDDIRECTORY:?}/{${build},${build}_upperdir,${build}_workdir}"
+    rm -rf "${BUILDDIRECTORY:?}/${build}"
+    rm -rf "${BUILDDIRECTORY:?}/${build}_upperdir"
+    rm -rf "${BUILDDIRECTORY:?}/${build}_workdir"
     trap - ERR INT
 }
 
