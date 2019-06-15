@@ -110,7 +110,7 @@ function remove_snapshot (){
 function create_snapshot (){
     local build=$1
 
-    trap '{ remove_snapshot $build ; exit 1; }' ERR INT
+    trap "{ remove_snapshot $build ; exit 1; }" ERR INT
 
     msg2 "Create snapshot for $build..."
     mkdir -p "$BUILDDIRECTORY/"{"${build}","${build}_upperdir","${build}_workdir"}
