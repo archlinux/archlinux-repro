@@ -74,7 +74,9 @@ readonly archive_url="https://archive.archlinux.org/packages"
 function get_archive_link () {
 	local pkg="$(rev <<< "${1}")"
 	local pkgname="$(cut -d'-' -f4- <<< "${pkg}" | rev)"
-	echo "${archive_url}/${1:0:1}/${pkgname}/${1}.pkg.tar.xz"
+	local archive_path="${archive_url}/${1:0:1}/${pkgname}/"
+	echo -n "${archive_path}"
+	curl -sSL "${archive_path}" | hq 'a[href]' attr href | egrep '^'"${1}"'\.pkg\.tar\.[a-z]+$'
 }
 
 # Desc: check validity of archive URL
