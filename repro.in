@@ -149,7 +149,7 @@ function init_chroot(){
     set -e
 
     if [ ! -d "$BUILDDIRECTORY" ]; then
-        mkdir -p $BUILDDIRECTORY
+        mkdir -p "$BUILDDIRECTORY"
     fi
 
     # Prepare root chroot
@@ -160,7 +160,7 @@ function init_chroot(){
         trap '{ cleanup_root_volume; trap - INT; kill -INT $$; }' INT
 
         msg2 "Extracting image into container..."
-        mkdir -p $BUILDDIRECTORY/root
+        mkdir -p "$BUILDDIRECTORY/root"
         tar xvf "$IMGDIRECTORY/$bootstrap_img" -C "$BUILDDIRECTORY/root" --strip-components=1 > /dev/null
 
 
