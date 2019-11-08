@@ -84,7 +84,12 @@ function error() {
 # 2: Command to execute
 function exec_nspawn(){
     local container=$1
-    systemd-nspawn -q --as-pid2 --register=no --pipe -D "$BUILDDIRECTORY/$container" "${@:2}"
+    systemd-nspawn -q \
+		--as-pid2 \
+		--register=no \
+		--pipe \
+		-E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
+		-D "$BUILDDIRECTORY/$container" "${@:2}"
 }
 
 # Desc: Removes the root container
@@ -266,7 +271,7 @@ __END__
     remove_snapshot "build"
 
     msg "Comparing hashes..."
-    if diff -q -- "$pkg" ./build/"$(basename "$pkgfile")" > /dev/null ; then
+    if diff -q -- "$pkg" ./build/"$(basename "$pkg")" > /dev/null ; then
       msg "Package is reproducible!"
     else
       error "Package is not reproducible"
