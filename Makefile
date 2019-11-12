@@ -1,4 +1,4 @@
-PROGNM ?= devtools-repro
+PROGNM ?= archlinux-repro
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 SHRDIR ?= $(PREFIX)/share
