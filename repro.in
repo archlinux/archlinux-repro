@@ -173,9 +173,6 @@ function init_chroot(){
         printf '%s.UTF-8 UTF-8\n' en_US de_DE > "$BUILDDIRECTORY"/root/etc/locale.gen
         printf 'LANG=en_US.UTF-8\n' > "$BUILDDIRECTORY"/root/etc/locale.conf
 
-        cp "$makepkg_conf" "$BUILDDIRECTORY"/root/etc/makepkg.conf
-        cp "$pacman_conf" "$BUILDDIRECTORY"/root/etc/pacman.conf
-
         systemd-machine-id-setup --root="$BUILDDIRECTORY"/root
         msg2 "Setting up keyring, this might take a while..."
         # exec_nspawn root pacman-key --init #&> /dev/null
@@ -191,12 +188,8 @@ function init_chroot(){
         exec_nspawn root useradd -m -G wheel -s /bin/bash builduser
         echo "keyserver-options auto-key-retrieve" | install -Dm644 /dev/stdin "$BUILDDIRECTORY/root"/home/builduser/.gnupg/gpg.conf
         exec_nspawn root chown -R builduser /home/builduser/.gnupg
-        cp "$makepkg_conf" "$BUILDDIRECTORY"/root/etc/makepkg.conf
-        cp "$pacman_conf" "$BUILDDIRECTORY"/root/etc/pacman.conf
     else
         printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
-        cp "$makepkg_conf" "$BUILDDIRECTORY"/root/etc/makepkg.conf
-        cp "$pacman_conf" "$BUILDDIRECTORY"/root/etc/pacman.conf
         exec_nspawn root pacman -Syu --noconfirm
     fi
 
@@ -305,18 +298,13 @@ Usage:
 General Options:
  -h                           Print this help message
  -d                           Run diffoscope if packages are not reproducible
- -P <file>                    Specify pacman.conf to build with
- -M <file>                    Specify makepkg.conf to build with
 __END__
 }
 
 hash buildinfo 2>/dev/null || { error "Require buildinfo in path! Aborting..."; exit 1; }
 
 # Default options
-pacman_conf=$CONFIGDIR/pacman.conf
-makepkg_conf=$CONFIGDIR/makepkg.conf
 run_diffoscope=0
-command_args=()
 
 repro_conf=${repro_conf:-$configdir/repro.conf}
 if [[ -r $repro_conf ]]; then
@@ -339,8 +327,6 @@ fi
 while getopts :hdoC:P:M: arg; do
     case $arg in
         h) print_help; exit 0;;
-        P) pacman_conf=$OPTARG;;
-        M) makepkg_conf=$OPTARG;;
         d) run_diffoscope=1;;
         *) ;;
     esac
@@ -348,10 +334,7 @@ done
 
 # Save command args (such as path to .pkg.tar.xz file)
 shift $((OPTIND-1))
-# shellcheck disable=SC2178
-command_args="$*"
 
-set -- "${command_args[@]}"
 get_bootstrap_img
 check_root
 init_chroot

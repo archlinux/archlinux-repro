@@ -32,12 +32,6 @@ Options
         `DIFFOSCOPE` can be set in linkman:repro.conf[5] to change the
         diffoscope command.
 
-*-P* <file>::
-        Specify a linkman:pacman.conf[5] file to use for the build container.
-
-*-M* <file>::
-        Specify a linkman:makepkg.conf[5] file to use for the build container.
-
 See Also
 --------
-linkman:makepkg[8], linkman:pacman.conf[5], linkman:makepkg.conf[5]
+linkman:makepkg[8]

@@ -35,10 +35,6 @@ Options
         Sets the linkman:diffoscope[1] command to be ran when unreproducible packages are
         encountered.
 
-**CONFIGDIR=**"/etc/devtools-repro/repro"::
-        Location of the location of makepkg.conf and pacman.conf used for the
-        container.
-
 **HOSTMIRROR=**"http://mirror.neuf.no/archlinux/\$repo/os/\$arch"::
         The mirror used inside the container by pacman.
 
@@ -48,4 +44,4 @@ Options
 
 See Also
 --------
-linkman:repro[8], linkman:makepkg.conf[5], linkman:pacman.conf[5]
+linkman:repro[8]
