@@ -140,7 +140,7 @@ install -d -o builduser -g builduser /pkgdest
 install -d -o builduser -g builduser /srcpkgdest
 mkdir -p $builddir
 cd $builddir
-sudo -u builduser SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg -sc --noconfirm
+sudo -u builduser LANG=C SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg -sc --noconfirm --skippgpcheck
 __END__
     mkdir -p "./$build"
     for pkgfile in "$BUILDDIRECTORY/$build"/pkgdest/*; do
