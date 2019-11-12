@@ -131,16 +131,16 @@ function create_snapshot (){
 # 2: Container buildpath
 function build_package(){
     local build=$1
-    local builddir=${2:-"/build"}
+    local builddir=${2:-"/startdir"}
     exec_nspawn "$build" \
         --bind="$PWD:/srcdest" \
 bash <<-__END__
 set -e
 install -d -o builduser -g builduser /pkgdest
 install -d -o builduser -g builduser /srcpkgdest
-mkdir -p $builddir
-cd $builddir
-sudo -u builduser LANG=C SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest makepkg -sc --noconfirm --skippgpcheck
+install -d -o builduser -g builduser /startdir
+install -d -o builduser -g builduser /build
+sudo -iu builduser bash -c 'cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg -sc --noconfirm --skippgpcheck'
 __END__
     mkdir -p "./$build"
     for pkgfile in "$BUILDDIRECTORY/$build"/pkgdest/*; do
@@ -224,17 +224,19 @@ function cmd_check(){
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
 
     {
+        printf 'PKGDEST=/pkgdest\n'
+        printf 'SRCPKGDEST=/srcpkgdest\n'
+        printf 'BUILDDIR=%s\n' "${builddir}"
         printf 'PACKAGER=%s\n' "${packager@Q}"
         printf 'OPTIONS=(%s)\n' "${options}"
         printf 'BUILDENV=(%s)\n' "${buildenv}"
-     } >> "$BUILDDIRECTORY/$build/home/builduser/.makepkg.conf"
+     } >> "$BUILDDIRECTORY/$build/etc/makepkg.conf"
 
     # Father I have sinned
     exec_nspawn "build" \
     bash <<-__END__
 shopt -s globstar
-mkdir -p $builddir
-chown builduser:builduser $builddir
+install -d -o builduser -g builduser /startdir
 pacman -S asp --noconfirm
 asp checkout $pkgbase
 cd $pkgbase
@@ -248,7 +250,7 @@ if [ \$pkgbuild_checksum != $pkgbuild_sha256sum ]; then
     echo "Warning PKGBUILD checksum does not match"
 	exit 1
 fi
-mv ./\$file_path/* $builddir
+mv ./\$file_path/* /startdir
 pacman -Rs asp --noconfirm
 __END__
 
