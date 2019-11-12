@@ -27,5 +27,15 @@ install: repro man
 	done;
 	install -Dm644 LICENSE -t $(DESTDIR)$(SHRDIR)/licenses/$(PROGNM)
 
+uninstall:
+	rm $(DESTDIR)$(BINDIR)/repro
+	rm $(DESTDIR)$(BINDIR)/buildinfo
+	rm -rf $(DESTDIR)$(CONFDIR)/$(PROGNM)
+	rm -rf $(DESTDIR)$(DOCDIR)/$(PROGNM)
+	for manfile in $(MANS); do \
+		rm $(DESTDIR)$(MANDIR)/man$${manfile##*.}/$${manfile##*/}; \
+	done;
+	rm -rf $(DESTDIR)$(SHRDIR)/licenses/$(PROGNM)
+
 clean:
 	rm -f repro $(MANS)
