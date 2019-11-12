@@ -8,7 +8,7 @@ repro.conf - repro configuration file
 
 Synopsis
 --------
-/etc/devtools-repro/repro.conf, $XDG_CONFIG_HOME/devtools-repro/repro.conf, ~/.repro.conf
+/etc/archlinux-repro/repro.conf, $XDG_CONFIG_HOME/archlinux-repro/repro.conf, ~/.repro.conf
 
 
 Description
@@ -17,7 +17,7 @@ Configuration options for repro are stored in repro.conf. This file is sourced
 by repro on launch. All the variables, regardless of being described below, are
 exported to the build environment.
 
-The system-wide configuration file is found in /etc/devtools-repro/repro.conf.
+The system-wide configuration file is found in /etc/archlinux-repro/repro.conf.
 Induvidual options can be override on a per-user basis in
 $XDG_CONFIG_HOME/devtools-repro/repro.conf or ~/.repro.conf, with the former
 taking priority.

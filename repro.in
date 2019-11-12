@@ -306,21 +306,19 @@ hash buildinfo 2>/dev/null || { error "Require buildinfo in path! Aborting..."; 
 # Default options
 run_diffoscope=0
 
-repro_conf=${repro_conf:-$configdir/repro.conf}
+repro_conf=$CONFIGDIR/repro.conf
 if [[ -r $repro_conf ]]; then
     # shellcheck source=/dev/null
     source "$repro_conf"
 fi
 
-xdg_repro_dir="${XDG_CONFIG_HOME:-$HOME/.config}/repro"
-if [[ "$repro_conf" = "$configdir/repro.conf" ]]; then
-    if [[ -r "$xdg_repro_dir/repro.conf" ]]; then
-        # shellcheck source=/dev/null
-        source "$xdg_repro_dir/repro.conf"
-    elif [[ -r "$HOME/.repro.conf" ]]; then
-        # shellcheck source=/dev/null
-        source "$HOME/.repro.conf"
-    fi
+xdg_repro_dir="${XDG_CONFIG_HOME:-$HOME/.config}/archlinux-repro"
+if [[ -r "$xdg_repro_dir/repro.conf" ]]; then
+	# shellcheck source=/dev/null
+	source "$xdg_repro_dir/repro.conf"
+elif [[ -r "$HOME/.repro.conf" ]]; then
+	# shellcheck source=/dev/null
+	source "$HOME/.repro.conf"
 fi
 
 
