@@ -217,15 +217,21 @@ function cmd_check(){
     pkgrel=${_pkgver##*-}
     pkgver=${_pkgver%-*}
     pkgbase=${buildinfo[pkgbase]}
+    options=${buildinfo[options]}
+    buildenv=${buildinfo[buildenv]}
 
     pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
 
-    printf 'PACKAGER=%s' "${packager@Q}" > "$BUILDDIRECTORY/build/home/builduser/.makepkg.conf"
+    {
+        printf 'PACKAGER=%s\n' "${packager@Q}"
+        printf 'OPTIONS=(%s)\n' "${options}"
+        printf 'BUILDENV=(%s)\n' "${buildenv}"
+     } >> "$BUILDDIRECTORY/$build/home/builduser/.makepkg.conf"
 
     # Father I have sinned
     exec_nspawn "build" \
-    bash -x  <<-__END__
+    bash <<-__END__
 shopt -s globstar
 mkdir -p $builddir
 chown builduser:builduser $builddir
@@ -240,6 +246,7 @@ pkgbuild_checksum=\${pkgbuild_checksum%% *}
 if [ \$pkgbuild_checksum != $pkgbuild_sha256sum ]; then
     # TODO: use warning or exit
     echo "Warning PKGBUILD checksum does not match"
+	exit 1
 fi
 mv ./\$file_path/* $builddir
 pacman -Rs asp --noconfirm
