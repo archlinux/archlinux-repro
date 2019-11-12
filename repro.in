@@ -138,7 +138,6 @@ bash <<-__END__
 set -e
 install -d -o builduser -g builduser /pkgdest
 install -d -o builduser -g builduser /srcpkgdest
-install -d -o builduser -g builduser /startdir
 install -d -o builduser -g builduser /build
 sudo -iu builduser bash -c 'cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg -sc --noconfirm --skippgpcheck'
 __END__
