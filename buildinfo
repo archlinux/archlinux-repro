@@ -103,7 +103,7 @@ function download_archive_package () {
 			echo "Downloading ${filename}" >&2
 			curl -L "${target}" -o "${filename}" 2>/dev/null
 			curl -L "${target}.sig" -o "${filename}.sig" 2>/dev/null
-			if gpg --keyring /etc/pacman.d/gnupg/pubring.gpg --verify "${filename}.sig" 2>/dev/null; then
+			if gpg --keyring /etc/pacman.d/gnupg/pubring.gpg --verify "${filename}.sig" "${filename}" 2>/dev/null; then
 				mv "${filename}" "${cachedir}/"
 				echo "${2}/${filename}"
 			else
