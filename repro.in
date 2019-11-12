@@ -153,9 +153,7 @@ __END__
 function init_chroot(){
     set -e
 
-    if [ ! -d "$BUILDDIRECTORY" ]; then
-        mkdir -p "$BUILDDIRECTORY"
-    fi
+    [ ! -d "$BUILDDIRECTORY" ] && mkdir -p "$BUILDDIRECTORY"
 
     # Prepare root chroot
     if [ ! -d "$BUILDDIRECTORY"/root ]; then
@@ -168,16 +166,12 @@ function init_chroot(){
         mkdir -p "$BUILDDIRECTORY/root"
         tar xvf "$IMGDIRECTORY/$bootstrap_img" -C "$BUILDDIRECTORY/root" --strip-components=1 > /dev/null
 
-
         printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
         printf '%s.UTF-8 UTF-8\n' en_US de_DE > "$BUILDDIRECTORY"/root/etc/locale.gen
         printf 'LANG=en_US.UTF-8\n' > "$BUILDDIRECTORY"/root/etc/locale.conf
 
         systemd-machine-id-setup --root="$BUILDDIRECTORY"/root
         msg2 "Setting up keyring, this might take a while..."
-        # exec_nspawn root pacman-key --init #&> /dev/null
-        # exec_nspawn root pacman-key --populate archlinux #&> /dev/null
-        # exec_nspawn root pacman-key --refresh #&> /dev/bull
 
         msg2 "Updating and installing base & base-devel"
         exec_nspawn root pacman -Syu base-devel --noconfirm
@@ -203,7 +197,7 @@ function cmd_check(){
     local cachedir="cache"
 
     if [[ ! -f "${pkg}" ]]; then
-      error "no pkg.tar.xz given"
+      error "no package file given"
       exit 1
     fi
 
@@ -276,11 +270,10 @@ __END__
 
 # Desc: Fetches a bootstrap image and verifies the signature
 function get_bootstrap_img() {
-    trap '{ rm "$IMGDIRECTORY/$bootstrap_img" ; exit 1; }' ERR
+    trap '{ rm "$IMGDIRECTORY/$bootstrap_img"{,.sig} ; exit 1; }' ERR
     if [ ! -e "$IMGDIRECTORY/$bootstrap_img" ]; then
         msg "Downloading bootstrap image..."
-        curl -o  "$IMGDIRECTORY/$bootstrap_img" "$BOOTSTRAPMIRROR/$bootstrap_img"
-        curl -o  "$IMGDIRECTORY/$bootstrap_img.sig" "$BOOTSTRAPMIRROR/$bootstrap_img.sig"
+        ( cd "$IMGDIRECTORY" && curl --remote-name-all "$BOOTSTRAPMIRROR/$bootstrap_img"{,.sig} )
         if ! gpg --verify "$IMGDIRECTORY/$bootstrap_img.sig" "$IMGDIRECTORY/$bootstrap_img"; then
             error "Can't verify image"
             exit 1
