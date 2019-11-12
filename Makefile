@@ -7,6 +7,8 @@ MANDIR ?= $(PREFIX)/share/man
 CONFDIR ?= /etc
 MANS = $(basename $(wildcard docs/*.txt))
 
+TAG = $(shell git describe --abbrev=0 --tags)
+
 all: man repro
 man: $(MANS)
 $(MANS):
