@@ -171,6 +171,8 @@ function init_chroot(){
 
         systemd-machine-id-setup --root="$BUILDDIRECTORY"/root
         msg2 "Setting up keyring, this might take a while..."
+        exec_nspawn root pacman-key --init &> /dev/null
+        exec_nspawn root pacman-key --populate archlinux &> /dev/null
 
         msg2 "Updating and installing base & base-devel"
         exec_nspawn root pacman -Syu base-devel --noconfirm
