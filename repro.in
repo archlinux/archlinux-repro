@@ -269,11 +269,13 @@ __END__
     msg "Comparing hashes..."
     if diff -q -- "$pkg" ./build/"$(basename "$pkg")" > /dev/null ; then
       msg "Package is reproducible!"
+      exit 0
     else
       error "Package is not reproducible"
       if ((run_diffoscope)); then
           PYTHONIOENCODING=utf-8 $DIFFOSCOPE "$pkg" ./build/"$(basename "$pkg")" || true
       fi
+      exit 1
     fi
 }
 
