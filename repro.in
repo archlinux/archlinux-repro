@@ -241,18 +241,17 @@ install -d -o builduser -g builduser /startdir
 pacman -S asp --noconfirm
 asp checkout $pkgbase
 cd $pkgbase
-history=\$(git grep --all-match -e pkgver=$pkgver -e pkgrel=$pkgrel \$(git rev-list --all -- repos/) -- repos/)
-cut -d: -f1 <<< \$history | head -1 | xargs git checkout
-file_path=\$(cut -d: -f2 <<< \$history | head -1 | xargs dirname)
-pkgbuild_checksum=\$(sha256sum -b \$file_path/PKGBUILD)
-pkgbuild_checksum=\${pkgbuild_checksum%% *}
-if [ \$pkgbuild_checksum != $pkgbuild_sha256sum ]; then
-    # TODO: use warning or exit
-    echo "Warning PKGBUILD checksum does not match"
-	exit 1
-fi
-mv ./\$file_path/* /startdir
-pacman -Rs asp --noconfirm
+for rev in \$(git rev-list --all -- repos/); do
+    pkgbuild_checksum=\$(git show \$rev:trunk/PKGBUILD | sha256sum -b)
+    pkgbuild_checksum=\${pkgbuild_checksum%% *}
+    if [ \$pkgbuild_checksum = $pkgbuild_sha256sum ]; then
+        git checkout \$rev
+        mv ./trunk/* /startdir
+        pacman -Rs asp --noconfirm
+        exit 0
+    fi
+done
+exit 1
 __END__
 
     msg2 "Preparing packages"
