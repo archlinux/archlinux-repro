@@ -71,10 +71,12 @@ readonly archive_url="https://archive.archlinux.org/packages"
 
 # Desc: get ALA link for given package
 # 1: Package
+# 2: Package compression
 function get_archive_link () {
 	local pkg="$(rev <<< "${1}")"
+	local ext="${2}"
 	local pkgname="$(cut -d'-' -f4- <<< "${pkg}" | rev)"
-	echo "${archive_url}/${1:0:1}/${pkgname}/${1}.pkg.tar.xz"
+	echo "${archive_url}/${1:0:1}/${pkgname}/${1}.pkg.tar.${ext}"
 }
 
 # Desc: check validity of archive URL
@@ -97,21 +99,23 @@ function download_archive_package () {
 	else
 		local pwd="$(pwd)"
 		local workdir="$(mktemp -d)"
-		local target="$(get_archive_link "${1}")"
 		cd "${workdir}" || exit 1
-		if verify_archive_link "${target}"; then
-			echo "Downloading ${filename}" >&2
-			curl -L "${target}" -o "${filename}" 2>/dev/null
-			curl -L "${target}.sig" -o "${filename}.sig" 2>/dev/null
-			if gpg --keyring /etc/pacman.d/gnupg/pubring.gpg --verify "${filename}.sig" "${filename}" 2>/dev/null; then
-				mv "${filename}" "${cachedir}/"
-				echo "${2}/${filename}"
-			else
-				echo "${filename} doesn't pass signature verification" >&2
-				echo "check ${workdir}" >&2
-				exit 1
+		for ext in zstd xz; do
+			local target="$(get_archive_link "${1}" "$ext")"
+			if verify_archive_link "${target}"; then
+				echo "Downloading ${filename}" >&2
+				curl -L "${target}" -o "${filename}" 2>/dev/null
+				curl -L "${target}.sig" -o "${filename}.sig" 2>/dev/null
+				if gpg --keyring /etc/pacman.d/gnupg/pubring.gpg --verify "${filename}.sig" "${filename}" 2>/dev/null; then
+					mv "${filename}" "${cachedir}/"
+					echo "${2}/${filename}"
+				else
+					echo "${filename} doesn't pass signature verification" >&2
+					echo "check ${workdir}" >&2
+					exit 1
+				fi
 			fi
-		fi
+		done
 		cd "${pwd}" || exit 1
 		rm -r "${workdir}"
 	fi
