@@ -100,7 +100,7 @@ function download_archive_package () {
 		local pwd="$(pwd)"
 		local workdir="$(mktemp -d)"
 		cd "${workdir}" || exit 1
-		for ext in zstd xz; do
+		for ext in zst xz; do
 			local target="$(get_archive_link "${1}" "$ext")"
 			if verify_archive_link "${target}"; then
 				echo "Downloading ${filename}" >&2
