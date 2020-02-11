@@ -25,6 +25,8 @@ declare -i format=1 builddate
 declare -a buildenv options installed
 declare -A data
 
+shopt -s extglob
+
 # Desc: Parses line into current global state
 # 1: line
 function parse_line () {
@@ -91,11 +93,11 @@ function verify_archive_link () {
 # 1: Package archive link
 # 2: Target directory
 function download_archive_package () {
-	local filename="${1}.pkg.tar.xz"
+	local cachename
 	local cachedir=$(readlink -e "${2}")
-	if [[ -f "${cachedir}/${filename}" ]]; then
-		echo "Hit cache for ${filename}" >&2
-		echo "${2}/${filename}"
+	if cachename=$(compgen -G "${2}/${1}.pkg.tar.@(xz|zst)" ); then
+		echo "Hit cache for $(basename ${cachename})" >&2
+		echo "${cachename}"
 	else
 		local pwd="$(pwd)"
 		local workdir="$(mktemp -d)"
@@ -103,6 +105,7 @@ function download_archive_package () {
 		for ext in zst xz; do
 			local target="$(get_archive_link "${1}" "$ext")"
 			if verify_archive_link "${target}"; then
+				local filename="$(basename ${target})"
 				echo "Downloading ${filename}" >&2
 				curl -L --remote-name-all "${target}" "${target}.sig" 2>/dev/null
 				if gpg --keyring /etc/pacman.d/gnupg/pubring.gpg --verify "${filename}.sig" "${filename}" 2>/dev/null; then
