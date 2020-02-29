@@ -231,6 +231,8 @@ function cmd_check(){
         printf 'PACKAGER=%s\n' "${packager@Q}"
         printf 'OPTIONS=(%s)\n' "${options}"
         printf 'BUILDENV=(%s)\n' "${buildenv}"
+        printf 'COMPRESSZST=(zstd -c -T0 --ultra -20 -)\n'
+        printf 'PKGEXT=".pkg.tar%s"\n' "${pkg##*tar}"
      } >> "$BUILDDIRECTORY/$build/etc/makepkg.conf"
 
     # Father I have sinned
