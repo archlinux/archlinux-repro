@@ -339,7 +339,7 @@ done
 # Save command args (such as path to .pkg.tar.xz file)
 shift $((OPTIND-1))
 
-get_bootstrap_img
+test -d "$BUILDDIRECTORY"/root || get_bootstrap_img
 check_root
 init_chroot
 cmd_check "$@"
