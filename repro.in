@@ -263,7 +263,12 @@ __END__
     msg "Installing packages"
     # shellcheck disable=SC2086
     exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" bash -c \
-        'yes y | pacman -U --overwrite "*" -- "$@"' -bash "${packages[@]}"
+        'yes y | pacman -Udd --overwrite "*" -- "$@"' -bash "${packages[@]}"
+
+    uninstall=$(comm -13 \
+        <(printf '%s\n' "${packages[@]}" | xargs -L1 pacman -Qpq | sort) \
+        <(exec_nspawn build pacman -Qq))
+    exec_nspawn build pacman -Rdd --noconfirm -- $uninstall
 
     build_package "build" "$builddir"
     remove_snapshot "build"
