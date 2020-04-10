@@ -11,9 +11,8 @@ CONFIGDIR='REPRO_CONFIG_DIR'
 ## Hardcoded until further notice
 HOSTMIRROR="http://mirror.neuf.no/archlinux/\$repo/os/\$arch"
 
-# IMGDIRECTORY=$(mktemp -dt .arch_img)
-IMGDIRECTORY="/tmp/arch_img"
-mkdir -p $IMGDIRECTORY
+IMGDIRECTORY=$(mktemp -dt XXXXXXXXXX.arch_img)
+trap "{ rm -r $IMGDIRECTORY; }" EXIT
 
 DIFFOSCOPE="diffoscope"
 
@@ -283,16 +282,14 @@ __END__
 
 # Desc: Fetches a bootstrap image and verifies the signature
 function get_bootstrap_img() {
-    trap '{ rm "$IMGDIRECTORY/$bootstrap_img"{,.sig} ; exit 1; }' ERR
     if [ ! -e "$IMGDIRECTORY/$bootstrap_img" ]; then
         msg "Downloading bootstrap image..."
-        ( cd "$IMGDIRECTORY" && curl --remote-name-all "$BOOTSTRAPMIRROR/$bootstrap_img"{,.sig} )
+        ( cd "$IMGDIRECTORY" && curl -f --remote-name-all "$BOOTSTRAPMIRROR/$bootstrap_img"{,.sig} )
         if ! gpg --verify "$IMGDIRECTORY/$bootstrap_img.sig" "$IMGDIRECTORY/$bootstrap_img"; then
             error "Can't verify image"
             exit 1
         fi
     fi
-    trap - ERR
 }
 
 # Desc: Prints the help section
@@ -339,7 +336,7 @@ done
 # Save command args (such as path to .pkg.tar.xz file)
 shift $((OPTIND-1))
 
-get_bootstrap_img
 check_root
+test -d "$BUILDDIRECTORY"/root || get_bootstrap_img
 init_chroot
 cmd_check "$@"
