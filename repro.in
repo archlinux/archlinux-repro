@@ -179,9 +179,9 @@ function init_chroot(){
         exec_nspawn root locale-gen
 
         printf 'builduser ALL = NOPASSWD: /usr/bin/pacman\n' > "$BUILDDIRECTORY"/root/etc/sudoers.d/builduser-pacman
-        exec_nspawn root useradd -m -G wheel -s /bin/bash builduser
-        echo "keyserver-options auto-key-retrieve" | install -Dm644 /dev/stdin "$BUILDDIRECTORY/root"/home/builduser/.gnupg/gpg.conf
-        exec_nspawn root chown -R builduser /home/builduser/.gnupg
+        exec_nspawn root useradd -m -G wheel -s /bin/bash -d /build builduser
+        echo "keyserver-options auto-key-retrieve" | install -Dm644 /dev/stdin "$BUILDDIRECTORY/root"/build/.gnupg/gpg.conf
+        exec_nspawn root chown -R builduser /build/.gnupg
     else
         printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
         exec_nspawn root pacman -Syu --noconfirm
