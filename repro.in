@@ -267,7 +267,7 @@ __END__
     read -r -a buildinfo_packages <<< "$(buildinfo -f installed "${pkg}")"
     uninstall=$(comm -13 \
         <(printf '%s\n' "${buildinfo_packages[@]}" | rev | cut -d- -f4- | rev | sort) \
-        <(exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" pacman -Qq))
+        <(exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" pacman -Qq | sort))
 
     exec_nspawn build pacman -Rdd --noconfirm -- $uninstall
 
