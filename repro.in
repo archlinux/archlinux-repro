@@ -84,6 +84,7 @@ function error() {
 function exec_nspawn(){
     local container=$1
     systemd-nspawn -q \
+		--ephemeral \
 		--as-pid2 \
 		--register=no \
 		--pipe \
