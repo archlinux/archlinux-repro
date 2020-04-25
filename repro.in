@@ -16,6 +16,43 @@ trap "{ rm -r $IMGDIRECTORY; }" EXIT
 
 DIFFOSCOPE="diffoscope"
 
+function get_subguids() {
+	local user=$(id -u)
+	local subuids
+	local subgids
+	while IFS=: read uid start count ; do
+		if [[ $user == $(id -u $uid) ]] ; then
+			subuids="1:$start:$count"
+			break
+		fi
+	done </etc/subuid
+	while IFS=: read uid start count ; do
+		if [[ $user == $(id -u $uid) ]] ; then
+			subgids="1:$start:$count"
+			break
+		fi
+	done </etc/subgid
+	[[ $subuids && $subgids ]] || return 1
+	printf " --uid_mapping %s --gid_mapping %s " "$subuids" "$subgids"
+}
+
+# Desc: Enter a user namespace with virtual privileges
+function become_rootless() {
+	((rootless_userns)) || return
+	((__REPRO_NSJAIL == 1)) && return
+	local subguids=$(get_subguids)
+	if (($?)) ; then
+		error "Your user has no subuids or subgids"
+		exit 1
+	fi
+	exec nsjail -Mo --quiet --skip_setsid \
+	            --disable_clone_newnet --disable_clone_newpid \
+	            --disable_rlimit --disable_proc --keep_caps \
+	            --chroot / --cwd "$(pwd)" --rw \
+	            --uid 0 --gid 0 $subguids \
+	            --keep_env  -E '__REPRO_NSJAIL=1' -- "${orig_argv[@]}"
+	#exec become-root unshare --mount "${orig_argv[@]}"
+}
 # Desc: Escalates privileges
 orig_argv=("$0" "$@")
 src_owner=${SUDO_USER:-$USER}
@@ -31,14 +68,16 @@ function check_root() {
 }
 
 function require_userns_tools() {
-	if command -v become-root >/dev/null \
+	#if command -v become-root >/dev/null \
+	if command -v unshare >/dev/null \
 		&& command -v nsjail >/dev/null \
 		&& command -v fuse-overlayfs >/dev/null
 	then
 		return 0
 	fi
-	warning "nsjail, fuse-overlayfs and become-root are necessary for rootless operation"
-	warning "https://github.com/giuseppe/become-root"
+	warning "nsjail, fuse-overlayfs and unshare (util-linux) are necessary for rootless operation"
+	#warning "nsjail, fuse-overlayfs and become-root are necessary for rootless operation"
+	#warning "https://github.com/giuseppe/become-root"
 	warning "https://github.com/containers/fuse-overlayfs"
 	warning "https://github.com/google/nsjail"
 	return 1
@@ -61,11 +100,11 @@ function umountoverlay() {
 
 # Use a private gpg keyring
 function gpg() {
-  command gpg --homedir="$BUILDDIRECTORY/_gnupg" "$@"
+  command gpg --homedir="$BUILDDIRECTORY/gnupg" "$@"
 }
 
 function init_gnupg() {
-    [ ! -d "$BUILDDIRECTORY/_gnupg" ] && mkdir -p "$BUILDDIRECTORY/_gnupg"
+	[ ! -d "$BUILDDIRECTORY/gnupg" ] && mkdir -p "$BUILDDIRECTORY/gnupg"
 
 	# ensure signing key is available
 	gpg --auto-key-locate nodefault,wkd --locate-keys pierre@archlinux.de
@@ -158,7 +197,6 @@ lock_close() {
     # shellcheck disable=2034
     exec {fd}>&-
 }
-
 # Desc: Executes an command inside a given nspawn container
 # 1: Container name
 # 2: Command to execute
@@ -171,6 +209,8 @@ function exec_nspawn(){
 		-E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
 		-D "$BUILDDIRECTORY/$container" "${@:2}"
 }
+
+
 # Desc: Executes an command inside a given nsjail container
 # 1: Container name
 # 2: Optional: one --bind=... bindmount option
@@ -202,6 +242,9 @@ function exec_container(){
 		exec_nspawn "$@"
 	fi
 }
+
+
+
 
 # Desc: Removes the root container
 function cleanup_root_volume(){
@@ -291,7 +334,9 @@ function init_chroot(){
         exec_container root pacman -R arch-install-scripts --noconfirm
         exec_container root locale-gen
 
-        printf 'builduser ALL = NOPASSWD: /usr/bin/pacman\n' > "$BUILDDIRECTORY"/root/etc/sudoers.d/builduser-pacman
+        printf '%s\n\n' 'Defaults preserve_groups' \
+				              'builduser ALL = NOPASSWD: /usr/bin/pacman' \
+				        > "$BUILDDIRECTORY"/root/etc/sudoers.d/builduser-pacman
         exec_container root useradd -m -G wheel -s /bin/bash -d /build builduser
         echo "keyserver-options auto-key-retrieve" | install -Dm644 /dev/stdin "$BUILDDIRECTORY/root"/build/.gnupg/gpg.conf
         exec_container root chown -R builduser /build/.gnupg
@@ -438,6 +483,7 @@ Usage:
 General Options:
  -h                           Print this help message
  -d                           Run diffoscope if packages are not reproducible
+ -r                           Run without root privileges in nsjail containers
 __END__
 }
 
@@ -468,6 +514,7 @@ while getopts :hdorC:P:M: arg; do
         d) run_diffoscope=1;;
         r) rootless_userns=1;
            require_userns_tools || exit 1
+           become_rootless
            # TODO: better detection for valid writable build directory
            [[ $BUILDDIRECTORY == /var/lib/repro ]] && BUILDDIRECTORY="${XDG_CACHE_HOME:-$HOME/.cache}/archlinux-repro"
            ;;
