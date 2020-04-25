@@ -224,6 +224,7 @@ function cmd_check(){
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
 
     {
+        printf 'MAKEFLAGS="%s"\n' "${MAKEFLAGS:--j$(nproc)}"
         printf 'PKGDEST=/pkgdest\n'
         printf 'SRCPKGDEST=/srcpkgdest\n'
         printf 'BUILDDIR=%s\n' "${builddir}"
