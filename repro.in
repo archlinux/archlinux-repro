@@ -28,6 +28,18 @@ function check_root() {
 	fi
 }
 
+# Use a private gpg keyring
+function gpg() {
+  command gpg --homedir="$BUILDDIRECTORY/gnupg" "$@"
+}
+
+function init_gnupg() {
+	[ ! -d "$BUILDDIRECTORY/gnupg" ] && mkdir -p "$BUILDDIRECTORY/gnupg"
+
+	# ensure signing key is available
+	gpg --auto-key-locate nodefault,wkd --locate-keys pierre@archlinux.de
+}
+
 # Desc: Sets the appropriate colors for output
 function colorize() {
 	# prefer terminal safe colored and bold text when tput is supported
@@ -346,6 +358,7 @@ done
 shift $((OPTIND-1))
 
 check_root
+init_gnupg
 test -d "$BUILDDIRECTORY"/root || get_bootstrap_img
 init_chroot
 cmd_check "$@"
