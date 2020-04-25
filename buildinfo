@@ -69,7 +69,7 @@ function parse_package () {
 	parse <<< "$(tar xOf "${1}" .BUILDINFO 2>/dev/null)"
 }
 
-readonly archive_url="https://archive.archlinux.org/packages"
+readonly archive_url="${ARCH_ARCHIVE_CACHE:-https://archive.archlinux.org/packages}"
 
 # Desc: get ALA link for given package
 # 1: Package
