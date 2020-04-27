@@ -247,6 +247,9 @@ function cmd_check(){
         printf 'PKGEXT=".pkg.tar%s"\n' "${pkg##*tar}"
      } >> "$BUILDDIRECTORY/$build/etc/makepkg.conf"
 
+    # We do the signature checking with pacman -Udd
+    sed -i "s/LocalFileSigLevel.*//g" "$BUILDDIRECTORY/$build/etc/pacman.conf"
+
     # Father I have sinned
     exec_nspawn "build" \
     bash <<-__END__

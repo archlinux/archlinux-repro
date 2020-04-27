@@ -107,12 +107,11 @@ function download_archive_package () {
 			if verify_archive_link "${target}"; then
 				local filename="$(basename ${target})"
 				echo "Downloading ${filename}" >&2
-				curl -L --remote-name-all "${target}" "${target}.sig" 2>/dev/null
-				if gpg --keyring /etc/pacman.d/gnupg/pubring.gpg --verify "${filename}.sig" "${filename}" 2>/dev/null; then
-					mv "${filename}" "${cachedir}/"
+				if curl -L --remote-name-all "${target}" "${target}.sig" 2>/dev/null; then
+					mv "${filename}"{,.sig} "${cachedir}/"
 					echo "${2}/${filename}"
 				else
-					echo "${filename} doesn't pass signature verification" >&2
+					echo "Couldn't download ${filename}" >&2
 					echo "check ${workdir}" >&2
 					exit 1
 				fi
