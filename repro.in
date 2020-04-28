@@ -162,9 +162,9 @@ function remove_snapshot (){
 # Desc: Creates a snapshot of the root container
 # 1: name of container
 function create_snapshot (){
-    local build=$1
+    local build="$1"
 
-    trap "{ remove_snapshot $build ; exit 1; }" ERR INT
+    trap "{ remove_snapshot \"$build\" ; exit 1; }" ERR INT
 
     msg2 "Create snapshot for $build..."
     mkdir -p "$BUILDDIRECTORY/"{"${build}","${build}_upperdir","${build}_workdir"}
@@ -276,6 +276,8 @@ function cmd_check(){
     pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
 
+
+    local build="${pkgbase}_$$"
 
     msg2 "Preparing packages"
     mkdir -p "${cachedir}"
