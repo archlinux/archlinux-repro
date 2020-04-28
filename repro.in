@@ -90,6 +90,44 @@ function error() {
 	printf "${RED}==> $(gettext "ERROR:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
+##
+#  usage : lock( $fd, $file, $message, [ $message_arguments... ] )
+##
+lock() {
+	# Only reopen the FD if it wasn't handed to us
+	if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
+		mkdir -p -- "$(dirname -- "$2")"
+		eval "exec $1>"'"$2"'
+	fi
+
+	flock -n "$1"
+}
+
+##
+#  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
+##
+slock() {
+	# Only reopen the FD if it wasn't handed to us
+	if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
+		mkdir -p -- "$(dirname -- "$2")"
+		eval "exec $1>"'"$2"'
+	fi
+
+	if ! flock -sn "$1"; then
+		flock -s "$1"
+	fi
+}
+
+##
+#  usage : lock_close( $fd )
+##
+lock_close() {
+	local fd=$1
+	# https://github.com/koalaman/shellcheck/issues/862
+	# shellcheck disable=2034
+	exec {fd}>&-
+}
+
 # Desc: Executes an command inside a given nspawn container
 # 1: Container name
 # 2: Command to execute
@@ -167,7 +205,7 @@ function init_chroot(){
 
     # Prepare root chroot
     if [ ! -d "$BUILDDIRECTORY"/root ]; then
-
+        lock 9 "$BUILDDIRECTORY"/root.lock
         msg "Preparing chroot"
         trap '{ cleanup_root_volume; exit 1; }' ERR
         trap '{ cleanup_root_volume; trap - INT; kill -INT $$; }' INT
@@ -194,11 +232,17 @@ function init_chroot(){
         exec_nspawn root useradd -m -G wheel -s /bin/bash -d /build builduser
         echo "keyserver-options auto-key-retrieve" | install -Dm644 /dev/stdin "$BUILDDIRECTORY/root"/build/.gnupg/gpg.conf
         exec_nspawn root chown -R builduser /build/.gnupg
+        lock_close 9
     else
+
+      if lock 9 "$BUILDDIRECTORY"/root.lock; then
         printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
         exec_nspawn root pacman -Syu --noconfirm
+        lock_close 9
+      else
+	msg "Couldn't acquire lock on root chroot, didn't update."
+      fi
     fi
-
     trap - ERR INT
 }
 
@@ -215,9 +259,6 @@ function cmd_check(){
 
     trap - ERR INT
 
-    msg "Starting build..."
-    create_snapshot "build" 0
-    build="build"
 
     declare -A buildinfo
     while IFS=$'=' read -r key value; do
@@ -235,6 +276,17 @@ function cmd_check(){
     pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
 
+
+    msg2 "Preparing packages"
+    mkdir -p "${cachedir}"
+    mapfile -t packages < <(buildinfo -d "${cachedir}" "${pkg}")
+    msg2 "Finished preparing packages"
+
+    msg "Starting build..."
+    slock 9 "$BUILDDIRECTORY"/root.lock
+    create_snapshot "$build" 0
+
+    # Setup environment
     {
         printf 'MAKEFLAGS="%s"\n' "${MAKEFLAGS:--j$(nproc)}"
         printf 'PKGDEST=/pkgdest\n'
@@ -246,12 +298,11 @@ function cmd_check(){
         printf 'COMPRESSZST=(zstd -c -T0 --ultra -20 -)\n'
         printf 'PKGEXT=".pkg.tar%s"\n' "${pkg##*tar}"
      } >> "$BUILDDIRECTORY/$build/etc/makepkg.conf"
-
     # We do the signature checking with pacman -Udd
     sed -i "s/LocalFileSigLevel.*//g" "$BUILDDIRECTORY/$build/etc/pacman.conf"
 
     # Father I have sinned
-    exec_nspawn "build" \
+    exec_nspawn "$build" \
     bash <<-__END__
 shopt -s globstar
 install -d -o builduser -g builduser /startdir
@@ -271,26 +322,23 @@ done
 exit 1
 __END__
 
-    msg2 "Preparing packages"
-    mkdir -p "${cachedir}"
-    mapfile -t packages < <(buildinfo -d "${cachedir}" "${pkg}")
-    msg2 "Finished preparing packages"
     msg "Installing packages"
     # shellcheck disable=SC2086
-    exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" bash -c \
+    exec_nspawn "$build" --bind="$(readlink -e ${cachedir}):/cache" bash -c \
         'yes y | pacman -Udd --overwrite "*" -- "$@"' -bash "${packages[@]}"
 
     read -r -a buildinfo_packages <<< "$(buildinfo -f installed "${pkg}")"
     uninstall=$(comm -13 \
         <(printf '%s\n' "${buildinfo_packages[@]}" | rev | cut -d- -f4- | rev | sort) \
-        <(exec_nspawn build --bind="$(readlink -e ${cachedir}):/cache" pacman -Qq | sort))
+        <(exec_nspawn "$build" --bind="$(readlink -e ${cachedir}):/cache" pacman -Qq | sort))
 
     if [ -n "$uninstall" ]; then
-        exec_nspawn build pacman -Rdd --noconfirm -- $uninstall
+        exec_nspawn "$build" pacman -Rdd --noconfirm -- $uninstall
     fi
 
-    build_package "build" "$builddir"
-    remove_snapshot "build"
+    build_package "$build" "$builddir"
+    remove_snapshot "$build"
+    lock_close 9
 
     msg "Comparing hashes..."
     if diff -q -- "$pkg" ./build/"$(basename "$pkg")" > /dev/null ; then
