@@ -30,11 +30,11 @@ function check_root() {
 
 # Use a private gpg keyring
 function gpg() {
-  command gpg --homedir="$BUILDDIRECTORY/gnupg" "$@"
+  command gpg --homedir="$BUILDDIRECTORY/_gnupg" "$@"
 }
 
 function init_gnupg() {
-	[ ! -d "$BUILDDIRECTORY/gnupg" ] && mkdir -p "$BUILDDIRECTORY/gnupg"
+	[ ! -d "$BUILDDIRECTORY/_gnupg" ] && mkdir -p "$BUILDDIRECTORY/_gnupg"
 
 	# ensure signing key is available
 	gpg --auto-key-locate nodefault,wkd --locate-keys pierre@archlinux.de
