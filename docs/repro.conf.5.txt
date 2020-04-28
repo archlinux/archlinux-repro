@@ -41,6 +41,12 @@ Options
 **IMGDIRECTORY=**"/tmp/arch_img"::
         Location where the Arch Linux bootstrap image should be downloaded to.
 
+**MAKEFLAGS=**"-j$(nproc)"::
+        Configure MAKEFLAGS on the node. The default is set for optimization purposes.
+
+**ARCH_ARCHIVE_CACHE=**"https://archive.archlinux.org/packages"::
+        Configure the archive  mirror to use when downloading archived packages.
+
 
 See Also
 --------
