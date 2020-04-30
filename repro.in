@@ -1,6 +1,10 @@
 #!/bin/bash
 set -eE -o pipefail
 
+if ((DEBUG)); then
+  set -x
+fi
+
 BUILDDIRECTORY=/var/lib/repro
 
 BOOTSTRAPMIRROR=https://mirror.archlinux.no/iso/latest
