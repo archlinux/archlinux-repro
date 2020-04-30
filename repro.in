@@ -190,11 +190,11 @@ install -d -o builduser -g builduser /srcpkgdest
 install -d -o builduser -g builduser /build
 sudo -iu builduser bash -c 'cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg -sc --noconfirm --skippgpcheck'
 __END__
-    mkdir -p "./$build"
+    mkdir -p "./build"
     for pkgfile in "$BUILDDIRECTORY/$build"/pkgdest/*; do
-        mv "$pkgfile" "./$build/"
+        mv "$pkgfile" "./build/"
     done
-    chown -R "$src_owner" "./$build"
+    chown -R "$src_owner" "./build"
 }
 
 # Desc: Sets up a container with the correct files
