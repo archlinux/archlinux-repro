@@ -20,6 +20,9 @@ trap "{ rm -r $IMGDIRECTORY; }" EXIT
 
 DIFFOSCOPE="diffoscope"
 
+# Turn on/off check in repro
+NOCHECK=0
+
 # Desc: Escalates privileges
 orig_argv=("$0" "$@")
 src_owner=${SUDO_USER:-$USER}
@@ -185,13 +188,17 @@ function create_snapshot (){
 function build_package(){
     local build=$1
     local builddir=${2:-"/startdir"}
+    local cmds=""
+    if ((NOCHECK)); then
+      cmds="--nocheck"
+    fi
     exec_nspawn "$build" \
 bash <<-__END__
 set -e
 install -d -o builduser -g builduser /pkgdest
 install -d -o builduser -g builduser /srcpkgdest
 install -d -o builduser -g builduser /build
-sudo -iu builduser bash -c 'cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg -sc --noconfirm --skippgpcheck'
+sudo -iu builduser bash -c 'cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg -sc --noconfirm --skippgpcheck $cmds'
 __END__
     mkdir -p "./build"
     for pkgfile in "$BUILDDIRECTORY/$build"/pkgdest/*; do
@@ -403,10 +410,11 @@ elif [[ -r "$HOME/.repro.conf" ]]; then
 fi
 
 
-while getopts :hdoC:P:M: arg; do
+while getopts :hdn arg; do
     case $arg in
         h) print_help; exit 0;;
         d) run_diffoscope=1;;
+        n) NOCHECK=1;;
         *) ;;
     esac
 done
