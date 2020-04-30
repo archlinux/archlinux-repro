@@ -16,78 +16,148 @@ trap "{ rm -r $IMGDIRECTORY; }" EXIT
 
 DIFFOSCOPE="diffoscope"
 
+function get_subguids() {
+	local user=$(id -u)
+	local subuids
+	local subgids
+	while IFS=: read uid start count ; do
+		if [[ $user == $(id -u $uid) ]] ; then
+			subuids="1:$start:$count"
+			break
+		fi
+	done </etc/subuid
+	while IFS=: read uid start count ; do
+		if [[ $user == $(id -u $uid) ]] ; then
+			subgids="1:$start:$count"
+			break
+		fi
+	done </etc/subgid
+	[[ $subuids && $subgids ]] || return 1
+	printf " --uid_mapping %s --gid_mapping %s " "$subuids" "$subgids"
+}
+
+# Desc: Enter a user namespace with virtual privileges
+function become_rootless() {
+	((rootless_userns)) || return
+	((__REPRO_NSJAIL == 1)) && return
+	local subguids=$(get_subguids)
+	if (($?)) ; then
+		error "Your user has no subuids or subgids"
+		exit 1
+	fi
+	exec nsjail -Mo --quiet --skip_setsid \
+	            --disable_clone_newnet --disable_clone_newpid \
+	            --disable_rlimit --disable_proc --keep_caps \
+	            --chroot / --cwd "$(pwd)" --rw \
+	            --uid 0 --gid 0 $subguids \
+	            --keep_env  -E '__REPRO_NSJAIL=1' -- "${orig_argv[@]}"
+	#exec become-root unshare --mount "${orig_argv[@]}"
+}
 # Desc: Escalates privileges
 orig_argv=("$0" "$@")
 src_owner=${SUDO_USER:-$USER}
 function check_root() {
-    (( EUID == 0 )) && return
-    if type -P sudo >/dev/null; then
-        exec sudo -- "${orig_argv[@]}"
-    else
-        exec su root -c "$(printf ' %q' "${orig_argv[@]}")"
-    fi
+	(( EUID == 0 )) && return
+	if ((rootless_userns)); then
+		exec become-root unshare --mount "${orig_argv[@]}"
+	elif type -P sudo >/dev/null; then
+		exec sudo -- "${orig_argv[@]}"
+	else
+		exec su root -c "$(printf ' %q' "${orig_argv[@]}")"
+	fi
+}
+
+function require_userns_tools() {
+	#if command -v become-root >/dev/null \
+	if command -v unshare >/dev/null \
+		&& command -v nsjail >/dev/null \
+		&& command -v fuse-overlayfs >/dev/null
+	then
+		return 0
+	fi
+	warning "nsjail, fuse-overlayfs and unshare (util-linux) are necessary for rootless operation"
+	#warning "nsjail, fuse-overlayfs and become-root are necessary for rootless operation"
+	#warning "https://github.com/giuseppe/become-root"
+	warning "https://github.com/containers/fuse-overlayfs"
+	warning "https://github.com/google/nsjail"
+	return 1
+}
+
+function mountoverlay() {
+	if ((rootless_userns)); then
+		fuse-overlayfs "$@"
+	else
+		mount -t overlayfs overlayfs "$@"
+	fi
+}
+function umountoverlay() {
+	if ((rootless_userns)); then
+	  fusermount -u "$@"
+	else
+		umount "$@"
+	fi
 }
 
 # Use a private gpg keyring
 function gpg() {
-  command gpg --homedir="$BUILDDIRECTORY/_gnupg" "$@"
+  command gpg --homedir="$BUILDDIRECTORY/gnupg" "$@"
 }
 
 function init_gnupg() {
-    [ ! -d "$BUILDDIRECTORY/_gnupg" ] && mkdir -p "$BUILDDIRECTORY/_gnupg"
+	[ ! -d "$BUILDDIRECTORY/gnupg" ] && mkdir -p "$BUILDDIRECTORY/gnupg"
 
-    # ensure signing key is available
-    gpg --auto-key-locate nodefault,wkd --locate-keys pierre@archlinux.de
+	# ensure signing key is available
+	gpg --auto-key-locate nodefault,wkd --locate-keys pierre@archlinux.de
 }
 
 # Desc: Sets the appropriate colors for output
 function colorize() {
-    # prefer terminal safe colored and bold text when tput is supported
-    if tput setaf 0 &>/dev/null; then
-        ALL_OFF="$(tput sgr0)"
-        BOLD="$(tput bold)"
-        BLUE="${BOLD}$(tput setaf 4)"
-        GREEN="${BOLD}$(tput setaf 2)"
-        RED="${BOLD}$(tput setaf 1)"
-        YELLOW="${BOLD}$(tput setaf 3)"
-    else
-        ALL_OFF="\e[0m"
-        BOLD="\e[1m"
-        BLUE="${BOLD}\e[34m"
-        GREEN="${BOLD}\e[32m"
-        RED="${BOLD}\e[31m"
-        YELLOW="${BOLD}\e[33m"
-    fi
-    readonly ALL_OFF BOLD BLUE GREEN RED YELLOW
+	# prefer terminal safe colored and bold text when tput is supported
+	if tput setaf 0 &>/dev/null; then
+		ALL_OFF="$(tput sgr0)"
+		BOLD="$(tput bold)"
+		BLUE="${BOLD}$(tput setaf 4)"
+		GREEN="${BOLD}$(tput setaf 2)"
+		RED="${BOLD}$(tput setaf 1)"
+		YELLOW="${BOLD}$(tput setaf 3)"
+	else
+		ALL_OFF="\e[0m"
+		BOLD="\e[1m"
+		BLUE="${BOLD}\e[34m"
+		GREEN="${BOLD}\e[32m"
+		RED="${BOLD}\e[31m"
+		YELLOW="${BOLD}\e[33m"
+	fi
+	readonly ALL_OFF BOLD BLUE GREEN RED YELLOW
 }
 colorize
 
 # Desc: Message format
 function msg() {
-    local mesg=$1; shift
+	local mesg=$1; shift
     # shellcheck disable=SC2059
-    printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 # Desc: Sub-message format
 function msg2() {
-    local mesg=$1; shift
+	local mesg=$1; shift
     # shellcheck disable=SC2059
-    printf "${BLUE}  ->${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+	printf "${BLUE}  ->${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 # Desc: Warning format
 function warning() {
-    local mesg=$1; shift
+	local mesg=$1; shift
     # shellcheck disable=SC2059
-    printf "${YELLOW}==> $(gettext "WARNING:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+	printf "${YELLOW}==> $(gettext "WARNING:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 # Desc: Error format
 function error() {
-    local mesg=$1; shift
+	local mesg=$1; shift
     # shellcheck disable=SC2059
-    printf "${RED}==> $(gettext "ERROR:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+	printf "${RED}==> $(gettext "ERROR:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 ##
@@ -127,19 +197,54 @@ lock_close() {
     # shellcheck disable=2034
     exec {fd}>&-
 }
-
 # Desc: Executes an command inside a given nspawn container
 # 1: Container name
 # 2: Command to execute
 function exec_nspawn(){
     local container=$1
     systemd-nspawn -q \
-      --as-pid2 \
-      --register=no \
-      --pipe \
-      -E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
-      -D "$BUILDDIRECTORY/$container" "${@:2}"
+		--as-pid2 \
+		--register=no \
+		--pipe \
+		-E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
+		-D "$BUILDDIRECTORY/$container" "${@:2}"
 }
+
+
+# Desc: Executes an command inside a given nsjail container
+# 1: Container name
+# 2: Optional: one --bind=... bindmount option
+# 2/3: Command to execute
+function exec_nsjail(){
+    local container=$1
+    local args=( -Mo --quiet
+            --disable_clone_newuser
+            --disable_clone_newnet
+            --disable_rlimits
+            --keep_caps
+            --tmpfsmount /tmp
+            --bindmount_ro /dev
+            -E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin"
+            --chroot "$BUILDDIRECTORY/$container" --rw
+          )
+    ## use a no-op forking unshare as pid1
+    if [[ $2 == --bind=* ]] ; then
+        nsjail "${args[@]}" --bindmount "${2#--bind=}" -- /usr/bin/unshare -f "${@:3}"
+    else
+        nsjail "${args[@]}" -- /usr/bin/unshare -f "${@:2}"
+    fi
+}
+
+function exec_container(){
+	if ((rootless_userns)); then
+		exec_nsjail "$@"
+	else
+		exec_nspawn "$@"
+	fi
+}
+
+
+
 
 # Desc: Removes the root container
 function cleanup_root_volume(){
@@ -152,7 +257,7 @@ function cleanup_root_volume(){
 function remove_snapshot (){
     local build=$1
     msg2 "Delete snapshot for $build..."
-    umount "$BUILDDIRECTORY/$build" || true
+    umountoverlay "$BUILDDIRECTORY/$build" || true
     rm -rf "${BUILDDIRECTORY:?}/${build}"
     rm -rf "${BUILDDIRECTORY:?}/${build}_upperdir"
     rm -rf "${BUILDDIRECTORY:?}/${build}_workdir"
@@ -169,7 +274,7 @@ function create_snapshot (){
     msg2 "Create snapshot for $build..."
     mkdir -p "$BUILDDIRECTORY/"{"${build}","${build}_upperdir","${build}_workdir"}
     # shellcheck disable=SC2140
-    mount -t overlay overlay \
+    mountoverlay \
         -o lowerdir="$BUILDDIRECTORY/root",upperdir="$BUILDDIRECTORY/${build}_upperdir",workdir="$BUILDDIRECTORY/${build}_workdir" \
         "$BUILDDIRECTORY/${build}"
     touch "$BUILDDIRECTORY/$build"
@@ -181,7 +286,7 @@ function create_snapshot (){
 function build_package(){
     local build=$1
     local builddir=${2:-"/startdir"}
-    exec_nspawn "$build" \
+    exec_container "$build" \
         --bind="$PWD:/srcdest" \
 bash <<-__END__
 set -e
@@ -205,6 +310,7 @@ function init_chroot(){
 
     # Prepare root chroot
     if [ ! -d "$BUILDDIRECTORY"/root ]; then
+
         lock 9 "$BUILDDIRECTORY"/root.lock
         msg "Preparing chroot"
         trap '{ cleanup_root_volume; exit 1; }' ERR
@@ -218,30 +324,32 @@ function init_chroot(){
         printf '%s.UTF-8 UTF-8\n' en_US de_DE > "$BUILDDIRECTORY"/root/etc/locale.gen
         printf 'LANG=en_US.UTF-8\n' > "$BUILDDIRECTORY"/root/etc/locale.conf
 
-        systemd-machine-id-setup --root="$BUILDDIRECTORY"/root
+        exec_container root systemd-machine-id-setup
         msg2 "Setting up keyring, this might take a while..."
-        exec_nspawn root pacman-key --init &> /dev/null
-        exec_nspawn root pacman-key --populate archlinux &> /dev/null
+        exec_container root pacman-key --init &> /dev/null
+        exec_container root pacman-key --populate archlinux &> /dev/null
 
         msg2 "Updating and installing base & base-devel"
-        exec_nspawn root pacman -Syu base-devel --noconfirm
-        exec_nspawn root pacman -R arch-install-scripts --noconfirm
-        exec_nspawn root locale-gen
+        exec_container root pacman -Syu base-devel --noconfirm
+        exec_container root pacman -R arch-install-scripts --noconfirm
+        exec_container root locale-gen
 
-        printf 'builduser ALL = NOPASSWD: /usr/bin/pacman\n' > "$BUILDDIRECTORY"/root/etc/sudoers.d/builduser-pacman
-        exec_nspawn root useradd -m -G wheel -s /bin/bash -d /build builduser
+        printf '%s\n\n' 'Defaults preserve_groups' \
+				              'builduser ALL = NOPASSWD: /usr/bin/pacman' \
+				        > "$BUILDDIRECTORY"/root/etc/sudoers.d/builduser-pacman
+        exec_container root useradd -m -G wheel -s /bin/bash -d /build builduser
         echo "keyserver-options auto-key-retrieve" | install -Dm644 /dev/stdin "$BUILDDIRECTORY/root"/build/.gnupg/gpg.conf
-        exec_nspawn root chown -R builduser /build/.gnupg
+        exec_container root chown -R builduser /build/.gnupg
         lock_close 9
     else
-
       if lock 9 "$BUILDDIRECTORY"/root.lock; then
-          printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
-          exec_nspawn root pacman -Syu --noconfirm
+        printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
+        exec_container root pacman -Syu --noconfirm
           lock_close 9
       else
           msg "Couldn't acquire lock on root chroot, didn't update."
-      fi
+    fi
+
     fi
     trap - ERR INT
 }
@@ -276,7 +384,6 @@ function cmd_check(){
     pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
 
-
     local build="${pkgbase}_$$"
 
     msg2 "Preparing packages"
@@ -304,7 +411,7 @@ function cmd_check(){
     sed -i "s/LocalFileSigLevel.*//g" "$BUILDDIRECTORY/$build/etc/pacman.conf"
 
     # Father I have sinned
-    exec_nspawn "$build" \
+    exec_container "$build" \
     bash <<-__END__
 shopt -s globstar
 install -d -o builduser -g builduser /startdir
@@ -326,16 +433,16 @@ __END__
 
     msg "Installing packages"
     # shellcheck disable=SC2086
-    exec_nspawn "$build" --bind="$(readlink -e ${cachedir}):/cache" bash -c \
+    exec_container "$build" --bind="$(readlink -e ${cachedir}):/cache" bash -c \
         'yes y | pacman -Udd --overwrite "*" -- "$@"' -bash "${packages[@]}"
 
     read -r -a buildinfo_packages <<< "$(buildinfo -f installed "${pkg}")"
     uninstall=$(comm -13 \
         <(printf '%s\n' "${buildinfo_packages[@]}" | rev | cut -d- -f4- | rev | sort) \
-        <(exec_nspawn "$build" --bind="$(readlink -e ${cachedir}):/cache" pacman -Qq | sort))
+        <(exec_container "$build" --bind="$(readlink -e ${cachedir}):/cache" pacman -Qq | sort))
 
     if [ -n "$uninstall" ]; then
-        exec_nspawn "$build" pacman -Rdd --noconfirm -- $uninstall
+        exec_container "$build" pacman -Rdd --noconfirm -- $uninstall
     fi
 
     build_package "$build" "$builddir"
@@ -376,6 +483,7 @@ Usage:
 General Options:
  -h                           Print this help message
  -d                           Run diffoscope if packages are not reproducible
+ -r                           Run without root privileges in nsjail containers
 __END__
 }
 
@@ -392,18 +500,24 @@ fi
 
 xdg_repro_dir="${XDG_CONFIG_HOME:-$HOME/.config}/archlinux-repro"
 if [[ -r "$xdg_repro_dir/repro.conf" ]]; then
-    # shellcheck source=/dev/null
-    source "$xdg_repro_dir/repro.conf"
+	# shellcheck source=/dev/null
+	source "$xdg_repro_dir/repro.conf"
 elif [[ -r "$HOME/.repro.conf" ]]; then
-    # shellcheck source=/dev/null
-    source "$HOME/.repro.conf"
+	# shellcheck source=/dev/null
+	source "$HOME/.repro.conf"
 fi
 
 
-while getopts :hdoC:P:M: arg; do
+while getopts :hdorC:P:M: arg; do
     case $arg in
         h) print_help; exit 0;;
         d) run_diffoscope=1;;
+        r) rootless_userns=1;
+           require_userns_tools || exit 1
+           become_rootless
+           # TODO: better detection for valid writable build directory
+           [[ $BUILDDIRECTORY == /var/lib/repro ]] && BUILDDIRECTORY="${XDG_CACHE_HOME:-$HOME/.cache}/archlinux-repro"
+           ;;
         *) ;;
     esac
 done
