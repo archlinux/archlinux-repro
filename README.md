@@ -18,3 +18,13 @@ Work in progress. Please read the code before using.
 * curl
 * gnupg
 * systemd
+
+# Running on Debian
+
+For Debian 10 backports need to be enabled for gnupg and systemd-container.
+
+* bash
+* gettext
+* systemd-container
+* bsdtar
+* zstd
