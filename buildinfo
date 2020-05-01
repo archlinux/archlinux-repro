@@ -160,6 +160,8 @@ if [[ "${action}" == "" ]]; then
 	exit 1
 fi
 
+hash tar zstd 2>/dev/null || { echo "Require tar and zstd in path! Aborting..."; exit 1; }
+
 declare file="$(readlink -e "${@: -1}")"
 set -- "${@:1:$(($#-1))}"
 if [[ "${file}" =~ \.pkg ]]; then
