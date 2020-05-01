@@ -47,6 +47,8 @@ Options
 **ARCH_ARCHIVE_CACHE=**"https://archive.archlinux.org/packages"::
         Configure the archive  mirror to use when downloading archived packages.
 
+**NOCHECK=**0::
+        Decide if makepkg should be run with or without --nocheck inside the container.
 
 See Also
 --------

@@ -21,15 +21,16 @@ trap "{ rm -r $IMGDIRECTORY; }" EXIT
 DIFFOSCOPE="diffoscope"
 
 # Turn on/off check in repro
-NOCHECK=0
+NOCHECK=${NOCHECK:-0}
 
 # Desc: Escalates privileges
 orig_argv=("$0" "$@")
 src_owner=${SUDO_USER:-$USER}
 function check_root() {
+    local keepenv=$1
     (( EUID == 0 )) && return
     if type -P sudo >/dev/null; then
-        exec sudo -- "${orig_argv[@]}"
+        exec sudo --preserve-env=$keepenv -- "${orig_argv[@]}"
     else
         exec su root -c "$(printf ' %q' "${orig_argv[@]}")"
     fi
@@ -422,7 +423,7 @@ done
 # Save command args (such as path to .pkg.tar.xz file)
 shift $((OPTIND-1))
 
-check_root
+check_root NOCHECK,MAKEFLAGS,DEBUG
 init_gnupg
 test -d "$BUILDDIRECTORY"/root || get_bootstrap_img
 init_chroot
