@@ -182,7 +182,6 @@ function build_package(){
     local build=$1
     local builddir=${2:-"/startdir"}
     exec_nspawn "$build" \
-        --bind="$PWD:/srcdest" \
 bash <<-__END__
 set -e
 install -d -o builduser -g builduser /pkgdest
