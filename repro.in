@@ -299,6 +299,28 @@ function cmd_check(){
     slock 9 "$BUILDDIRECTORY"/root.lock
     create_snapshot "$build" 0
 
+    # Father I have sinned
+    exec_nspawn "$build" \
+    bash <<-__END__
+shopt -s globstar
+install -d -o builduser -g builduser /startdir
+pacman -S asp devtools --noconfirm
+cp /usr/share/devtools/makepkg-x86_64.conf /etc/makepkg.conf
+asp checkout $pkgbase
+cd $pkgbase
+for rev in \$(git rev-list --all -- repos/); do
+    pkgbuild_checksum=\$(git show \$rev:trunk/PKGBUILD | sha256sum -b)
+    pkgbuild_checksum=\${pkgbuild_checksum%% *}
+    if [ \$pkgbuild_checksum = $pkgbuild_sha256sum ]; then
+        git checkout \$rev
+        mv ./trunk/* /startdir
+        pacman -Rs asp devtools --noconfirm
+        exit 0
+    fi
+done
+exit 1
+__END__
+
     # Setup environment
     {
         printf 'MAKEFLAGS="%s"\n' "${MAKEFLAGS:--j$(nproc)}"
@@ -314,26 +336,6 @@ function cmd_check(){
     # We do the signature checking with pacman -Udd
     sed -i "s/LocalFileSigLevel.*//g" "$BUILDDIRECTORY/$build/etc/pacman.conf"
 
-    # Father I have sinned
-    exec_nspawn "$build" \
-    bash <<-__END__
-shopt -s globstar
-install -d -o builduser -g builduser /startdir
-pacman -S asp --noconfirm
-asp checkout $pkgbase
-cd $pkgbase
-for rev in \$(git rev-list --all -- repos/); do
-    pkgbuild_checksum=\$(git show \$rev:trunk/PKGBUILD | sha256sum -b)
-    pkgbuild_checksum=\${pkgbuild_checksum%% *}
-    if [ \$pkgbuild_checksum = $pkgbuild_sha256sum ]; then
-        git checkout \$rev
-        mv ./trunk/* /startdir
-        pacman -Rs asp --noconfirm
-        exit 0
-    fi
-done
-exit 1
-__END__
 
     msg "Installing packages"
     # shellcheck disable=SC2086
