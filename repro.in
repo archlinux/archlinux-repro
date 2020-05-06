@@ -45,7 +45,9 @@ function init_gnupg() {
     [ ! -d "$BUILDDIRECTORY/_gnupg" ] && mkdir -p "$BUILDDIRECTORY/_gnupg"
 
     # ensure signing key is available
-    gpg --auto-key-locate nodefault,wkd --locate-keys pierre@archlinux.de
+    # We try WKD first, then fallback to keyservers.
+    # This works on debian./
+    gpg --keyserver=p80.pool.sks-keyservers.net --auto-key-locate wkd,keyserver --locate-keys pierre@archlinux.de
 }
 
 # Desc: Sets the appropriate colors for output
