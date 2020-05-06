@@ -283,12 +283,18 @@ function cmd_check(){
     pkgbase=${buildinfo[pkgbase]}
     options=${buildinfo[options]}
     buildenv=${buildinfo[buildenv]}
+    format=${buildinfo[format]}
 
     pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
 
 
     local build="${pkgbase}_$$"
+
+    if [[ ${format} -ne 1 ]]; then
+      error "unsupported BUILDINFO format or no format definition found, aborting rebuild"
+      exit 1
+    fi
 
     msg2 "Preparing packages"
     mkdir -p "${cachedir}"

@@ -205,7 +205,7 @@ case "${action}" in
 	esac
 	;;
 "field_all")
-	for field in pkgname pkgbase pkgver pkgbuild_sha256sum packager builddate builddir; do
+	for field in pkgname pkgbase pkgver pkgbuild_sha256sum packager builddate builddir format; do
 		echo -e "${field}=${data[${field}]}"
 	done
 	echo -e "buildenv=${buildenv[*]}"
