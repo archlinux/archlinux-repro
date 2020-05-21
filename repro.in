@@ -359,6 +359,16 @@ __END__
 
     if [ -n "$uninstall" ]; then
         exec_nspawn "$build" pacman -Rdd --noconfirm -- $uninstall
+
+        # We might encounter issues where packages has been renamed, and we overwrote the files
+        # This causes pacman to remove .so-names beliving it belongs to the package we removed
+        # This fixes any messed up packages as reported by -Qqk
+        # Note: ++ is removed because DEBUG gets injected into stderr
+        if ! fixup=$(exec_nspawn "$build" pacman -Qqk 2>&1 | grep -v "^++" | awk '{print $1}' | uniq); then
+          fixup_packages=$(echo $fixup| tr ' ' '\0' | xargs -0 -n1 -I{} bash -c "printf -- '%s\n' ${packages[*]} | grep {}")
+          exec_nspawn "$build" --bind="$(readlink -e ${cachedir}):/cache" bash -c \
+              'yes y | pacman -Udd -- "$@"' -bash "${fixup_packages}"
+        fi
     fi
 
     build_package "$build" "$builddir"
