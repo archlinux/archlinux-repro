@@ -246,6 +246,7 @@ function init_chroot(){
         exec_nspawn root useradd -m -G wheel -s /bin/bash -d /build builduser
         echo "keyserver-options auto-key-retrieve" | install -Dm644 /dev/stdin "$BUILDDIRECTORY/root"/build/.gnupg/gpg.conf
         exec_nspawn root chown -R builduser /build/.gnupg
+        exec_nspawn root chmod 700 /build/.gnupg
         lock_close 9
     else
 
