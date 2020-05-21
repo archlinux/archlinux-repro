@@ -201,6 +201,7 @@ set -e
 install -d -o builduser -g builduser /pkgdest
 install -d -o builduser -g builduser /srcpkgdest
 install -d -o builduser -g builduser /build
+source /etc/profile
 sudo -iu builduser bash -c 'cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg -sc --noconfirm --skippgpcheck $cmds'
 __END__
     mkdir -p "./build"
