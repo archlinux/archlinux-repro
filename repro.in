@@ -368,7 +368,7 @@ __END__
         if [ -n "$fixup" ]; then
           fixup_packages=$(echo $fixup| tr ' ' '\0' | xargs -0 -n1 -I{} bash -c "printf -- '%s\n' ${packages[*]} | grep {}")
           exec_nspawn "$build" --bind="$(readlink -e ${cachedir}):/cache" bash -c \
-              'yes y | pacman -Udd -- "$@"' -bash "${fixup_packages}"
+              'yes y | pacman -Udd -- "$@"' -bash ${fixup_packages}
         fi
     fi
 
