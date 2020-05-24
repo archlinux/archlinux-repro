@@ -310,7 +310,7 @@ function cmd_check(){
     create_snapshot "$build" 0
 
     # Father I have sinned
-    exec_nspawn "$build" \
+    exec_nspawn "$build" --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
     bash <<-__END__
 shopt -s globstar
 install -d -o builduser -g builduser /startdir

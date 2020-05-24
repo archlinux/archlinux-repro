@@ -95,9 +95,12 @@ function verify_archive_link () {
 function download_archive_package () {
 	local cachename
 	local cachedir=$(readlink -e "${2}")
-	if cachename=$(compgen -G "${2}/${1}.pkg.tar.@(xz|zst)" ); then
-		echo "Hit cache for $(basename ${cachename})" >&2
-		echo "${cachename}"
+	if [ -f "${2}/${1}.pkg.tar.xz" ] && [ -f "${2}/${1}.pkg.tar.xz.sig" ]; then
+		echo "Hit cache for ${2}/${1}.pkg.tar.xz" >&2
+		echo "${2}/${1}.pkg.tar.xz"
+	elif [ -f "${2}/${1}.pkg.tar.zst" ] && [ -f "${2}/${1}.pkg.tar.zst.sig" ]; then
+		echo "Hit cache for ${2}/${1}.pkg.tar.zst" >&2
+		echo "${2}/${1}.pkg.tar.zst"
 	else
 		local pwd="$(pwd)"
 		local workdir="$(mktemp -d)"
