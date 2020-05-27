@@ -374,6 +374,7 @@ __END__
 
     build_package "$build" "$builddir"
     remove_snapshot "$build"
+    chown -R "$src_owner" "${cachedir}"
     lock_close 9
 
     msg "Comparing hashes..."
