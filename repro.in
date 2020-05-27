@@ -201,9 +201,8 @@ set -e
 install -d -o builduser -g builduser /pkgdest
 install -d -o builduser -g builduser /srcpkgdest
 install -d -o builduser -g builduser /build
-source /etc/profile
-sudo -iu builduser bash -c 'cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg -sc --noconfirm --skippgpcheck $cmds'
 __END__
+    exec_nspawn "$build" /usr/bin/setsid -f -c -w sudo -iu builduser bash -c ". /etc/profile; cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg -sc --noconfirm --skippgpcheck $cmds"
     mkdir -p "./build"
     for pkgfile in "$BUILDDIRECTORY/$build"/pkgdest/*; do
         mv "$pkgfile" "./build/"
