@@ -193,9 +193,13 @@ function create_snapshot (){
 function build_package(){
     local build=$1
     local builddir=${2:-"/startdir"}
+    local args=""
     local cmds=""
     if ((NOCHECK)); then
       cmds="--nocheck"
+    fi
+    if ((pkgbuild_file)); then
+      args=--bind="${PWD}:/startdir"
     fi
     exec_nspawn "$build" \
 bash <<-__END__
@@ -204,7 +208,7 @@ install -d -o builduser -g builduser /pkgdest
 install -d -o builduser -g builduser /srcpkgdest
 install -d -o builduser -g builduser /build
 __END__
-    exec_nspawn "$build" /usr/bin/setsid -f -c -w sudo -iu builduser bash -c ". /etc/profile; cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg -sc --noconfirm --skippgpcheck $cmds"
+    exec_nspawn "$build" $args sudo -iu builduser bash -c ". /etc/profile; cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg -sc --noconfirm --skippgpcheck $cmds"
     mkdir -p "./build"
     for pkgfile in "$BUILDDIRECTORY/$build"/pkgdest/*; do
         mv "$pkgfile" "./build/"
@@ -311,6 +315,7 @@ function cmd_check(){
     create_snapshot "$build" 0
 
     # Father I have sinned
+    if ((!pkgbuild_file)); then
     exec_nspawn "$build" --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
     bash <<-__END__
 shopt -s globstar
@@ -331,6 +336,15 @@ for rev in \$(git rev-list --all -- repos/); do
 done
 exit 1
 __END__
+  elif [[ -r "PKGBUILD" ]]; then
+    if [[ "$(sha256sum PKGBUILD | awk '{print $1}')" != "$pkgbuild_sha256sum" ]]; then
+      error "PKGBUILD doesn't match the checksum"
+      exit 1
+    fi
+  else
+    error "No PKGBUILD file present!"
+    exit 1
+  fi
 
     # Setup environment
     {
@@ -420,6 +434,9 @@ hash buildinfo 2>/dev/null || { error "Require buildinfo in path! Aborting..."; 
 # Default options
 run_diffoscope=0
 
+# By default we don't assume a PKGBUILD
+pkgbuild_file=0
+
 repro_conf=$CONFIGDIR/repro.conf
 if [[ -r $repro_conf ]]; then
     # shellcheck source=/dev/null
@@ -436,9 +453,10 @@ elif [[ -r "$HOME/.repro.conf" ]]; then
 fi
 
 
-while getopts :hdn arg; do
+while getopts :hdnf arg; do
     case $arg in
         h) print_help; exit 0;;
+        f) pkgbuild_file=1;;
         d) run_diffoscope=1;;
         n) NOCHECK=1;;
         *) ;;
