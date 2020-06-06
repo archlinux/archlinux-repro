@@ -23,6 +23,8 @@ DIFFOSCOPE="diffoscope"
 # Turn on/off check in repro
 NOCHECK=${NOCHECK:-0}
 
+CACHEDIR="cache"
+
 # Desc: Escalates privileges
 orig_argv=("$0" "$@")
 src_owner=${SUDO_USER:-$USER}
@@ -264,7 +266,7 @@ function init_chroot(){
 # 1: Location of package
 function cmd_check(){
     local pkg="${1}"
-    local cachedir="cache"
+    local cachedir="${CACHEDIR}"
 
     if [[ ! -f "${pkg}" ]]; then
       error "no package file given"

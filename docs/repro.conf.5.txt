@@ -49,6 +49,10 @@ Options
 
 **NOCHECK=**0::
         Decide if makepkg should be run with or without --nocheck inside the container.
+        Note: This could affect the build process.
+
+**CACHEDIR=**cache::
+        Choose the cache directory location. The default creates a cache in the working directory.
 
 See Also
 --------
