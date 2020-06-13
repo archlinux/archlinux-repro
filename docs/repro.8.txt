@@ -32,6 +32,11 @@ Options
         `DIFFOSCOPE` can be set in linkman:repro.conf[5] to change the
         diffoscope command.
 
+*-f*::
+        When enabled, `repro` check for a PKGBUILD file in the current working
+        directory. This one is used to build the package instead of checking out
+        a PKGBUILD from asp.
+
 See Also
 --------
 linkman:makepkg[8]
