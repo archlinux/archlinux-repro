@@ -25,6 +25,11 @@ DIFFOSCOPE="diffoscope"
 # Turn on/off check in repro
 NOCHECK=${NOCHECK:-0}
 
+# Check if systemd >=242
+if [ $(systemd-nspawn --version | grep -m 1 -Eo '[0-9]+' | head -1) -ge 242 ]; then
+    ISSYSTEMD242=1
+fi
+
 CACHEDIR="${CACHEDIR:-cache}"
 OUTDIR="${OUTDIR:-./build}"
 
@@ -193,7 +198,7 @@ function exec_nspawn(){
         --as-pid2 \
         --register=no \
         ${EPHEMERAL:+--ephemeral} \
-        --pipe \
+        ${ISSYSTEMD242:+--pipe} \
         -E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
         -D "$BUILDDIRECTORY/$container" "${@:2}"
     if ((EPHEMERAL)); then
