@@ -172,11 +172,20 @@ lock_close() {
     exec {fd}>&-
 }
 
+function check_systemd_version(){
+    systemd_version=$(systemd-nspawn --version | grep -m 1 -Eo '[0-9]+' | head -1)
+    if [ $systemd_version -ge 242 ]; then
+        unset systemd_version
+    fi
+}
+
 # Desc: Executes an command inside a given nspawn container
 # 1: Container name
 # 2: Command to execute
 function exec_nspawn(){
     local container=$1
+
+    check_systemd_version
 
     # EPHEMERAL in systemd-nspawn uses implicit overlayfs mounts to provide
     # the container. If the root container is being updated or files are in
@@ -193,7 +202,7 @@ function exec_nspawn(){
         --as-pid2 \
         --register=no \
         ${EPHEMERAL:+--ephemeral} \
-        --pipe \
+        ${systemd_version:---pipe} \
         -E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
         -D "$BUILDDIRECTORY/$container" "${@:2}"
     if ((EPHEMERAL)); then
