@@ -23,7 +23,7 @@ DIFFOSCOPE="diffoscope"
 # Turn on/off check in repro
 NOCHECK=${NOCHECK:-0}
 
-CACHEDIR="cache"
+CACHEDIR="${CACHEDIR:-cache}"
 
 # Desc: Escalates privileges
 orig_argv=("$0" "$@")
@@ -458,7 +458,7 @@ done
 # Save command args (such as path to .pkg.tar.xz file)
 shift $((OPTIND-1))
 
-check_root NOCHECK,MAKEFLAGS,DEBUG
+check_root NOCHECK,MAKEFLAGS,DEBUG,CACHEDIR
 init_gnupg
 test -d "$BUILDDIRECTORY"/root || get_bootstrap_img
 init_chroot
