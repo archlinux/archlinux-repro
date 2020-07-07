@@ -362,6 +362,11 @@ __END__
     sed -i "s/LocalFileSigLevel.*//g" "$BUILDDIRECTORY/$build/etc/pacman.conf"
 
 
+    # buildinfo returns packages with absolute paths to the location
+    # this strips the paths and adds "cache/" prefix
+    packages=(${packages[@]##*/})
+    packages=(${packages[@]/#/cache\/})
+
     msg "Installing packages"
     # shellcheck disable=SC2086
     exec_nspawn "$build" --bind="$(readlink -e ${cachedir}):/cache" bash -c \
