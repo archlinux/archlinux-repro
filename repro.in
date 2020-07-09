@@ -423,6 +423,8 @@ Usage:
 General Options:
  -h                           Print this help message
  -d                           Run diffoscope if packages are not reproducible
+ -f                           Use the local PKGBUILD for building
+ -n                           Run makepkg with --nocheck
 __END__
 }
 
