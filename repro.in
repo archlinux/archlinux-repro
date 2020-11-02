@@ -164,10 +164,7 @@ function cleanup_root_volume(){
 function remove_snapshot (){
     local build=$1
     msg2 "Delete snapshot for $build..."
-    umount "$BUILDDIRECTORY/$build" || true
     rm -rf "${BUILDDIRECTORY:?}/${build}"
-    rm -rf "${BUILDDIRECTORY:?}/${build}_upperdir"
-    rm -rf "${BUILDDIRECTORY:?}/${build}_workdir"
     trap - ERR INT
 }
 
@@ -179,11 +176,7 @@ function create_snapshot (){
     trap "{ remove_snapshot \"$build\" ; exit 1; }" ERR INT
 
     msg2 "Create snapshot for $build..."
-    mkdir -p "$BUILDDIRECTORY/"{"${build}","${build}_upperdir","${build}_workdir"}
-    # shellcheck disable=SC2140
-    mount -t overlay overlay \
-        -o lowerdir="$BUILDDIRECTORY/root",upperdir="$BUILDDIRECTORY/${build}_upperdir",workdir="$BUILDDIRECTORY/${build}_workdir" \
-        "$BUILDDIRECTORY/${build}"
+    mkdir -p "${BUILDDIRECTORY}/${build}/startdir"
     touch "$BUILDDIRECTORY/$build"
 }
 
@@ -234,24 +227,14 @@ function init_chroot(){
         tar xvf "$IMGDIRECTORY/$bootstrap_img" -C "$BUILDDIRECTORY/root" --strip-components=1 > /dev/null
 
         printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
-        printf '%s.UTF-8 UTF-8\n' en_US de_DE > "$BUILDDIRECTORY"/root/etc/locale.gen
-        printf 'LANG=en_US.UTF-8\n' > "$BUILDDIRECTORY"/root/etc/locale.conf
+        sed -i "s/LocalFileSigLevel.*/LocalFileSigLevel = Never/g" "$BUILDDIRECTORY/root/etc/pacman.conf"
+
 
         systemd-machine-id-setup --root="$BUILDDIRECTORY"/root
         msg2 "Setting up keyring, this might take a while..."
         exec_nspawn root pacman-key --init &> /dev/null
         exec_nspawn root pacman-key --populate archlinux &> /dev/null
-
-        msg2 "Updating and installing base & base-devel"
-        exec_nspawn root pacman -Syu base-devel --noconfirm
-        exec_nspawn root pacman -R arch-install-scripts --noconfirm
-        exec_nspawn root locale-gen
-
-        printf 'builduser ALL = NOPASSWD: /usr/bin/pacman\n' > "$BUILDDIRECTORY"/root/etc/sudoers.d/builduser-pacman
-        exec_nspawn root useradd -m -G wheel -s /bin/bash -d /build builduser
-        echo "keyserver-options auto-key-retrieve" | install -Dm644 /dev/stdin "$BUILDDIRECTORY/root"/build/.gnupg/gpg.conf
-        exec_nspawn root chown -R builduser /build/.gnupg
-        exec_nspawn root chmod 700 /build/.gnupg
+        exec_nspawn root pacman -Sy
         lock_close 9
     else
 
@@ -297,9 +280,6 @@ function cmd_check(){
     pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
 
-
-    local build="${pkgbase}_$$"
-
     if [[ ${format} -ne 1 ]]; then
       error "unsupported BUILDINFO format or no format definition found, aborting rebuild"
       exit 1
@@ -312,25 +292,29 @@ function cmd_check(){
 
     msg "Starting build..."
     slock 9 "$BUILDDIRECTORY"/root.lock
+
+    local build="${pkgbase}_$$"
     create_snapshot "$build" 0
+
+    local build_root_dir="$BUILDDIRECTORY/${build}"
 
     # Father I have sinned
     if ((!pkgbuild_file)); then
-    exec_nspawn "$build" --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
+    exec_nspawn root --bind="${build_root_dir}/startdir:/startdir" --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
     bash <<-__END__
 shopt -s globstar
-install -d -o builduser -g builduser /startdir
 pacman -S asp devtools --noconfirm
 cp /usr/share/devtools/makepkg-x86_64.conf /etc/makepkg.conf
 asp checkout $pkgbase
-cd $pkgbase
+pushd $pkgbase
 for rev in \$(git rev-list --all -- repos/); do
     pkgbuild_checksum=\$(git show \$rev:trunk/PKGBUILD | sha256sum -b)
     pkgbuild_checksum=\${pkgbuild_checksum%% *}
     if [ \$pkgbuild_checksum = $pkgbuild_sha256sum ]; then
         git checkout \$rev
         mv ./trunk/* /startdir
-        pacman -Rs asp devtools --noconfirm
+        popd
+        rm -rf $pkgbase
         exit 0
     fi
 done
@@ -346,6 +330,16 @@ __END__
     exit 1
   fi
 
+    # buildinfo returns packages with absolute paths to the location
+    # this strips the paths and adds "cache/" prefix
+    packages=(${packages[@]##*/})
+    packages=(${packages[@]/#/cache\/})
+
+    msg "Installing packages"
+    # shellcheck disable=SC2086
+    exec_nspawn "root" --bind="${build_root_dir}:/mnt" --bind="$(readlink -e ${cachedir}):/cache" bash -c \
+        'pacstrap -U /mnt "$@"' -bash "${packages[@]}"
+
     # Setup environment
     {
         printf 'MAKEFLAGS="%s"\n' "${MAKEFLAGS:--j$(nproc)}"
@@ -357,32 +351,17 @@ __END__
         printf 'BUILDENV=(%s)\n' "${buildenv}"
         printf 'COMPRESSZST=(zstd -c -T0 --ultra -20 -)\n'
         printf 'PKGEXT=".pkg.tar%s"\n' "${pkg##*tar}"
-     } >> "$BUILDDIRECTORY/$build/etc/makepkg.conf"
-    # We do the signature checking with pacman -Udd
-    sed -i "s/LocalFileSigLevel.*//g" "$BUILDDIRECTORY/$build/etc/pacman.conf"
+     } >> "$build_root_dir/etc/makepkg.conf"
 
+    printf '%s.UTF-8 UTF-8\n' en_US de_DE > "$build_root_dir/etc/locale.gen"
+    printf 'LANG=en_US.UTF-8\n' > "$build_root_dir/etc/locale.conf"
+    exec_nspawn "$build" locale-gen
 
-    # buildinfo returns packages with absolute paths to the location
-    # this strips the paths and adds "cache/" prefix
-    packages=(${packages[@]##*/})
-    packages=(${packages[@]/#/cache\/})
-
-    msg "Installing packages"
-    # shellcheck disable=SC2086
-    exec_nspawn "$build" --bind="$(readlink -e ${cachedir}):/cache" bash -c \
-        'yes y | pacman -Udd --needed --overwrite "*" -- "$@"' -bash "${packages[@]}"
-
-    read -r -a buildinfo_packages <<< "$(buildinfo -f installed "${pkg}")"
-    uninstall=$(comm -13 \
-        <(printf '%s\n' "${buildinfo_packages[@]}" | rev | cut -d- -f4- | rev | sort) \
-        <(exec_nspawn "$build" --bind="$(readlink -e ${cachedir}):/cache" pacman -Qq | sort))
-
-    if [ -n "$uninstall" ]; then
-        exec_nspawn "$build" pacman -Rdd --noconfirm -- $uninstall
-    fi
-
-    # reinstall all packages - fixes overwritten files and installs with correct dependency order
-    exec_nspawn "$build" --bind="$(readlink -e ${cachedir}):/cache" pacman -U --noconfirm -- "${packages[@]}"
+    printf 'builduser ALL = NOPASSWD: /usr/bin/pacman\n' > "$build_root_dir/etc/sudoers.d/builduser-pacman"
+    exec_nspawn "$build" useradd -m -s /bin/bash -d /build builduser
+    echo "keyserver-options auto-key-retrieve" | install -Dm644 /dev/stdin "$build_root_dir/build/.gnupg/gpg.conf"
+    exec_nspawn "$build" chown -R builduser /build/.gnupg /startdir
+    exec_nspawn "$build" chmod 700 /build/.gnupg
 
     build_package "$build" "$builddir"
     remove_snapshot "$build"

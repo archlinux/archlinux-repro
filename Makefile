@@ -18,6 +18,7 @@ docs/repro.%: docs/repro.%.txt docs/asciidoc.conf
 
 repro: repro.in
 	m4 -DREPRO_CONFIG_DIR=$(CONFDIR)/$(PROGNM) $< >$@
+	chmod 755 $@
 
 .PHONY: install
 install: repro man
