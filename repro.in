@@ -229,9 +229,13 @@ function init_chroot(){
         exec_nspawn root pacman-key --init &> /dev/null
         exec_nspawn root pacman-key --populate archlinux &> /dev/null
         exec_nspawn root pacman -Sy
+        touch "$BUILDDIRECTORY/root/.repro-1"
         lock_close 9
     else
-
+      if [ ! -d "$BUILDDIRECTORY/root/.repro-1" ]; then
+        error "Please delete $BUILDDIRECTORY and initialize the chroots again"
+        exit 1
+      fi
       if lock 9 "$BUILDDIRECTORY"/root.lock; then
           printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
           exec_nspawn root pacman -Syu --noconfirm
