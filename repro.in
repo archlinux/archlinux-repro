@@ -49,7 +49,7 @@ function init_gnupg() {
     # ensure signing key is available
     # We try WKD first, then fallback to keyservers.
     # This works on debian./
-    gpg --keyserver=p80.pool.sks-keyservers.net --auto-key-locate wkd,keyserver --locate-keys pierre@archlinux.de
+    gpg --keyserver=p80.pool.sks-keyservers.net --auto-key-locate wkd,keyserver --locate-keys pierre@archlinux.de &>/dev/null
 }
 
 # Desc: Sets the appropriate colors for output
