@@ -222,8 +222,7 @@ function init_chroot(){
         tar xvf "$IMGDIRECTORY/$bootstrap_img" -C "$BUILDDIRECTORY/root" --strip-components=1 > /dev/null
 
         printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
-        sed -i "s/LocalFileSigLevel.*/LocalFileSigLevel = Never/g" "$BUILDDIRECTORY/root/etc/pacman.conf"
-
+        sed -i "s/LocalFileSigLevel.*//g" "$BUILDDIRECTORY/root/etc/pacman.conf"
 
         systemd-machine-id-setup --root="$BUILDDIRECTORY"/root
         msg2 "Setting up keyring, this might take a while..."
