@@ -7,6 +7,8 @@ fi
 
 BUILDDIRECTORY=/var/lib/repro
 
+KEYRINGCACHE="${BUILDDIRECTORY}/keyring"
+
 BOOTSTRAPMIRROR=https://mirror.archlinux.no/iso/latest
 readonly bootstrap_img=archlinux-bootstrap-"$(date +%Y.%m)".01-"$(uname -m)".tar.gz
 CONFIGDIR='REPRO_CONFIG_DIR'
@@ -118,16 +120,14 @@ lock() {
 ##
 #  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
 ##
-slock() {
+nlock() {
     # Only reopen the FD if it wasn't handed to us
     if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
         mkdir -p -- "$(dirname -- "$2")"
         eval "exec $1>"'"$2"'
     fi
 
-    if ! flock -sn "$1"; then
-        flock -s "$1"
-    fi
+    flock "$1"
 }
 
 ##
@@ -148,6 +148,7 @@ function exec_nspawn(){
     systemd-nspawn -q \
       --as-pid2 \
       --register=no \
+      ${EPHEMERAL:+--ephemeral} \
       --pipe \
       -E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
       -D "$BUILDDIRECTORY/$container" "${@:2}"
@@ -272,6 +273,8 @@ function cmd_check(){
     options=${buildinfo[options]}
     buildenv=${buildinfo[buildenv]}
     format=${buildinfo[format]}
+    installed=${buildinfo[installed]}
+
 
     pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
@@ -287,8 +290,6 @@ function cmd_check(){
     msg2 "Finished preparing packages"
 
     msg "Starting build..."
-    slock 9 "$BUILDDIRECTORY"/root.lock
-
     local build="${pkgbase}_$$"
     create_snapshot "$build" 0
 
@@ -296,7 +297,7 @@ function cmd_check(){
 
     # Father I have sinned
     if ((!pkgbuild_file)); then
-    exec_nspawn root --bind="${build_root_dir}/startdir:/startdir" --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
+    EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}/startdir:/startdir" --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
     bash <<-__END__
 shopt -s globstar
 pacman -S asp devtools --noconfirm
@@ -309,8 +310,6 @@ for rev in \$(git rev-list --all -- repos/); do
     if [ \$pkgbuild_checksum = $pkgbuild_sha256sum ]; then
         git checkout \$rev
         mv ./trunk/* /startdir
-        popd
-        rm -rf $pkgbase
         exit 0
     fi
 done
@@ -331,10 +330,36 @@ __END__
     packages=(${packages[@]##*/})
     packages=(${packages[@]/#/cache\/})
 
+    # shellcheck disable=SC2086
+    keyring_package="$(printf -- '%s\n' ${installed[*]} | grep -E "archlinux-keyring")"
+
+    if [ ! -d "$KEYRINGCACHE/$keyring_package" ]; then
+      msg2 "Setting up $keyring_package in keyring cache, this might take a while..."
+
+      nlock 9 "$KEYRINGCACHE/$keyring_package.lock"
+      # shellcheck disable=SC2086
+      keyring=$(printf -- '%s\n' ${packages[*]} | grep -E "archlinux-keyring")
+      EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}:/mnt" --bind="$(readlink -e "${cachedir}"):/cache" bash -c \
+          'pacstrap -U /mnt "$@"' -bash "${keyring}" &>/dev/null
+
+      mkdir -p "$KEYRINGCACHE/$keyring_package"
+      EPHEMERAL=1 exec_nspawn root \
+        --bind="$KEYRINGCACHE/$keyring_package:/mnt" \
+        --bind="${build_root_dir}/usr/share/pacman/keyrings:/usr/share/pacman/keyrings" \
+        -E PACMAN_KEYRING_DIR=/mnt \
+        bash -c 'pacman-key --init && pacman-key --populate archlinux' &>/dev/null
+      lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
+    else
+      msg2 "Found $keyring_package in keyring cache"
+    fi
+
     msg "Installing packages"
     # shellcheck disable=SC2086
-    exec_nspawn "root" --bind="${build_root_dir}:/mnt" --bind="$(readlink -e ${cachedir}):/cache" bash -c \
-        'pacstrap -U /mnt "$@"' -bash "${packages[@]}"
+    EPHEMERAL=1 exec_nspawn root \
+      --bind="${build_root_dir}:/mnt" \
+      --bind-ro="$KEYRINGCACHE/$keyring_package:/etc/pacman.d/gnupg" \
+      --bind="$(readlink -e ${cachedir}):/cache" bash -c \
+      'pacstrap -G -U /mnt --needed "$@"' -bash "${packages[@]}"
 
     # Setup environment
     {
@@ -362,7 +387,6 @@ __END__
     build_package "$build" "$builddir"
     remove_snapshot "$build"
     chown -R "$src_owner" "${cachedir}"
-    lock_close 9
 
     msg "Comparing hashes..."
     if diff -q -- "$pkg" ./build/"$(basename "$pkg")" > /dev/null ; then
@@ -443,5 +467,6 @@ shift $((OPTIND-1))
 check_root NOCHECK,MAKEFLAGS,DEBUG,CACHEDIR
 init_gnupg
 test -d "$BUILDDIRECTORY"/root || get_bootstrap_img
+test -d "$KEYRINGCACHE" || mkdir -p "$KEYRINGCACHE"
 init_chroot
 cmd_check "$@"
