@@ -232,7 +232,7 @@ function init_chroot(){
         touch "$BUILDDIRECTORY/root/.repro-1"
         lock_close 9
     else
-      if [ ! -d "$BUILDDIRECTORY/root/.repro-1" ]; then
+      if [ ! -f "$BUILDDIRECTORY/root/.repro-1" ]; then
         error "Please delete $BUILDDIRECTORY and initialize the chroots again"
         exit 1
       fi
