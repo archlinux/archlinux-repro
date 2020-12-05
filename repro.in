@@ -344,12 +344,14 @@ __END__
           'pacstrap -U /mnt "$@"' -bash "${keyring}" &>/dev/null
 
       mkdir -p "$KEYRINGCACHE/$keyring_package"
+      trap "{ rm -rf $KEYRINGCACHE/$keyring_package ; exit 1; }" ERR INT
       EPHEMERAL=1 exec_nspawn root \
         --bind="$KEYRINGCACHE/$keyring_package:/mnt" \
         --bind="${build_root_dir}/usr/share/pacman/keyrings:/usr/share/pacman/keyrings" \
         -E PACMAN_KEYRING_DIR=/mnt \
         bash -c 'pacman-key --init && pacman-key --populate archlinux' &>/dev/null
       lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
+      trap - ERR INT
     else
       msg2 "Found $keyring_package in keyring cache"
     fi
