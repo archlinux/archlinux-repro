@@ -37,6 +37,10 @@ Options
         directory. This one is used to build the package instead of checking out
         a PKGBUILD from asp.
 
+*-o*::
+        Set the output directory for the rebuilt packages. Defaults to
+        `./build`.
+
 See Also
 --------
 linkman:makepkg[8]
