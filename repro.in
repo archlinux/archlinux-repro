@@ -229,10 +229,10 @@ function init_chroot(){
         exec_nspawn root pacman-key --init &> /dev/null
         exec_nspawn root pacman-key --populate archlinux &> /dev/null
         exec_nspawn root pacman -Sy
-        touch "$BUILDDIRECTORY/root/.repro-1"
+        touch "$BUILDDIRECTORY/root/.repro-2"
         lock_close 9
     else
-      if [ ! -f "$BUILDDIRECTORY/root/.repro-1" ]; then
+      if [ ! -f "$BUILDDIRECTORY/root/.repro-2" ]; then
         error "Please delete $BUILDDIRECTORY and initialize the chroots again"
         exit 1
       fi
@@ -334,16 +334,7 @@ __END__
     # shellcheck disable=SC2086
     keyring_package="$(printf -- '%s\n' ${installed[*]} | grep -E "archlinux-keyring")"
 
-    if [ ! -d "$KEYRINGCACHE/$keyring_package" ] || ! grep -q "faked-system-time" "$KEYRINGCACHE/$keyring_package/gpg.conf" ; then
-
-      # In previous versions we created keyrings without setting
-      # faked-system-time, which causes issues, so if we find an old
-      # keyring delete and recreate it.
-      if [ -d "$KEYRINGCACHE/$keyring_package" ]; then
-        msg2 "Found old keyring in cache, recreating"
-        rm -rf "$KEYRINGCACHE/$keyring_package"
-      fi
-
+    if [ ! -d "$KEYRINGCACHE/$keyring_package" ]; then
       msg2 "Setting up $keyring_package in keyring cache, this might take a while..."
 
       nlock 9 "$KEYRINGCACHE/$keyring_package.lock"
@@ -373,12 +364,10 @@ __END__
 
       keyring_build_date="$(buildinfo -f builddate "${cachedir}/${keyring##*/}")"
 
-      # Note that we intentionally leave faked-system-time in gpg.conf
-      # to signal that this keyring was created after we started using
-      # it. Keyrings created by earlier versions of repro need to be
-      # recreated. This will be overridden during the actual build by
-      # adding another faked-system-time line to the end of the file,
-      # which takes precedence.
+      # Note that while we leave faked-system-time in gpg.conf, this
+      # will be overridden during the actual build by adding another
+      # faked-system-time line to the end of the file, which takes
+      # precedence.
       EPHEMERAL=1 exec_nspawn root \
         --bind="$KEYRINGCACHE/$keyring_package:/mnt" \
         --bind="${build_root_dir}/usr/share/pacman/keyrings:/usr/share/pacman/keyrings" \
