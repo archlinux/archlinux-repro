@@ -334,7 +334,16 @@ __END__
     # shellcheck disable=SC2086
     keyring_package="$(printf -- '%s\n' ${installed[*]} | grep -E "archlinux-keyring")"
 
-    if [ ! -d "$KEYRINGCACHE/$keyring_package" ]; then
+    if [ ! -d "$KEYRINGCACHE/$keyring_package" ] || ! grep -q "faked-system-time" "$KEYRINGCACHE/$keyring_package/gpg.conf" ; then
+
+      # In previous versions we created keyrings without setting
+      # faked-system-time, which causes issues, so if we find an old
+      # keyring delete and recreate it.
+      if [ -d "$KEYRINGCACHE/$keyring_package" ]; then
+        msg2 "Found old keyring in cache, recreating"
+        rm -rf "$KEYRINGCACHE/$keyring_package"
+      fi
+
       msg2 "Setting up $keyring_package in keyring cache, this might take a while..."
 
       nlock 9 "$KEYRINGCACHE/$keyring_package.lock"
@@ -345,11 +354,40 @@ __END__
 
       mkdir -p "$KEYRINGCACHE/$keyring_package"
       trap "{ rm -rf $KEYRINGCACHE/$keyring_package ; exit 1; }" ERR INT
+
+      # We have to rewind time for gpg when building a package so that
+      # signatures which were valid at the time the package was built
+      # are still considered valid now, even if e.g. one of the keys
+      # has since expired.
+      #
+      # However, gpg is finicky about time. Signatures which appear to
+      # be created in the future, or by a key created in the future,
+      # will be ignored. Keys which appear to be created in the future
+      # cannot be signed. To make things work we need to create the
+      # local master key and sign everything at a time after every key
+      # in the keyring exists, but before any packages that depend on
+      # it could have been built.
+      #
+      # Do this by using precisely the time that the keyring package
+      # was built.
+
+      keyring_build_date="$(buildinfo -f builddate "${cachedir}/${keyring##*/}")"
+
+      # Note that we intentionally leave faked-system-time in gpg.conf
+      # to signal that this keyring was created after we started using
+      # it. Keyrings created by earlier versions of repro need to be
+      # recreated. This will be overridden during the actual build by
+      # adding another faked-system-time line to the end of the file,
+      # which takes precedence.
       EPHEMERAL=1 exec_nspawn root \
         --bind="$KEYRINGCACHE/$keyring_package:/mnt" \
         --bind="${build_root_dir}/usr/share/pacman/keyrings:/usr/share/pacman/keyrings" \
         -E PACMAN_KEYRING_DIR=/mnt \
-        bash -c 'pacman-key --init && pacman-key --populate archlinux' &>/dev/null
+        bash &> /dev/null <<-__END__
+echo "faked-system-time ${keyring_build_date}" >> /mnt/gpg.conf
+pacman-key --init
+pacman-key --populate archlinux
+__END__
       lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
       trap - ERR INT
     else
@@ -360,9 +398,14 @@ __END__
     # shellcheck disable=SC2086
     EPHEMERAL=1 exec_nspawn root \
       --bind="${build_root_dir}:/mnt" \
-      --bind-ro="$KEYRINGCACHE/$keyring_package:/etc/pacman.d/gnupg" \
-      --bind="$(readlink -e ${cachedir}):/cache" bash -c \
-      'pacstrap -G -U /mnt --needed "$@"' -bash "${packages[@]}"
+      --bind-ro="$KEYRINGCACHE/$keyring_package:/gnupg" \
+      --bind="$(readlink -e ${cachedir}):/cache" \
+      bash -bash "${packages[@]}" <<-__END__
+rm --recursive /etc/pacman.d/gnupg/
+cp --target-directory=/etc/pacman.d/ --recursive /gnupg
+echo "faked-system-time ${SOURCE_DATE_EPOCH}" >> /etc/pacman.d/gnupg/gpg.conf
+pacstrap -G -U /mnt --needed "\$@"
+__END__
 
     # Setup environment
     {
