@@ -47,7 +47,7 @@ function gpg() {
 }
 
 function init_gnupg() {
-    [ ! -d "$BUILDDIRECTORY/_gnupg" ] && mkdir -p "$BUILDDIRECTORY/_gnupg"
+    mkdir -p "$BUILDDIRECTORY/_gnupg"
 
     # ensure signing key is available
     # We try WKD first, then fallback to keyservers.
@@ -209,7 +209,7 @@ __END__
 function init_chroot(){
     set -e
 
-    [ ! -d "$BUILDDIRECTORY" ] && mkdir -p "$BUILDDIRECTORY"
+    mkdir -p "$BUILDDIRECTORY"
 
     # Prepare root chroot
     if [ ! -d "$BUILDDIRECTORY"/root ]; then
@@ -518,6 +518,6 @@ shift $((OPTIND-1))
 check_root NOCHECK,MAKEFLAGS,DEBUG,CACHEDIR
 init_gnupg
 test -d "$BUILDDIRECTORY"/root || get_bootstrap_img
-test -d "$KEYRINGCACHE" || mkdir -p "$KEYRINGCACHE"
+mkdir -p "$KEYRINGCACHE"
 init_chroot
 cmd_check "$@"
