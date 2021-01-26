@@ -46,4 +46,4 @@ Options
 
 See Also
 --------
-linkman:makepkg[8]
+linkman:makepkg[8] linkman:repro.conf[5]
