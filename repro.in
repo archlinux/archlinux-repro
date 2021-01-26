@@ -528,8 +528,6 @@ function source_conf() {
     fi
 }
 
-hash buildinfo 2>/dev/null || { error "Require buildinfo in path! Aborting..."; exit 1; }
-
 source_conf
 parse_args "$@"
 check_root NOCHECK,MAKEFLAGS,DEBUG,CACHEDIR
