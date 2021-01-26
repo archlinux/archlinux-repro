@@ -337,6 +337,8 @@ __END__
     # shellcheck disable=SC2086
     keyring_package="$(printf -- '%s\n' ${installed[*]} | grep -E "archlinux-keyring")"
 
+    mkdir -p "$KEYRINGCACHE"
+
     if [ ! -d "$KEYRINGCACHE/$keyring_package" ]; then
       msg2 "Setting up $keyring_package in keyring cache, this might take a while..."
 
@@ -518,6 +520,5 @@ fi
 shift $((OPTIND-1))
 
 check_root NOCHECK,MAKEFLAGS,DEBUG,CACHEDIR
-mkdir -p "$KEYRINGCACHE"
 init_chroot
 cmd_check "$@"
