@@ -258,18 +258,10 @@ function init_chroot(){
 }
 
 # Desc: Reproduces a package
-# 1: Location of package
 function cmd_check(){
-    local pkg="${1}"
     local cachedir="${CACHEDIR}"
 
-    if [[ ! -f "${pkg}" ]]; then
-      error "no package file given"
-      exit 1
-    fi
-
     trap - ERR INT
-
 
     declare -A buildinfo
     while IFS=$'=' read -r key value; do
@@ -492,6 +484,16 @@ function parse_args() {
     if ((NOCHECK)); then
         makepkg_args+=(--nocheck)
     fi
+
+    # Save command args (such as path to .pkg.tar.xz file)
+    shift $((OPTIND-1))
+
+    pkg="$@"
+    if [[ ! -f "${pkg}" ]]; then
+        error "argument provided ${pkg} isn't a valid file"
+        print_help
+        exit 1
+    fi
 }
 
 hash buildinfo 2>/dev/null || { error "Require buildinfo in path! Aborting..."; exit 1; }
@@ -519,10 +521,6 @@ fi
 
 
 parse_args "$@"
-
-# Save command args (such as path to .pkg.tar.xz file)
-shift $((OPTIND-1))
-
 check_root NOCHECK,MAKEFLAGS,DEBUG,CACHEDIR
 init_chroot
-cmd_check "$@"
+cmd_check
