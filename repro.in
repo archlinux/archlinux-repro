@@ -207,8 +207,6 @@ __END__
 
 # Desc: Sets up a container with the correct files
 function init_chroot(){
-    set -e
-
     mkdir -p "$BUILDDIRECTORY"
 
     # Prepare root chroot
