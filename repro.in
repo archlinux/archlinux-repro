@@ -28,6 +28,13 @@ NOCHECK=${NOCHECK:-0}
 CACHEDIR="${CACHEDIR:-cache}"
 OUTDIR="${OUTDIR:-./build}"
 
+makepkg_args=(
+    --syncdeps
+    --clean
+    --noconfirm
+    --skippgpcheck
+)
+
 # Desc: Escalates privileges
 orig_argv=("$0" "$@")
 src_owner=${SUDO_USER:-$USER}
@@ -470,6 +477,23 @@ General Options:
 __END__
 }
 
+function parse_args() {
+    while getopts :hdnf arg; do
+        case $arg in
+            h) print_help; exit 0;;
+            f) pkgbuild_file=1;;
+            d) run_diffoscope=1;;
+            n) NOCHECK=1;;
+            o) OUTDIR="$OPTARG";;
+            *) ;;
+        esac
+    done
+
+    if ((NOCHECK)); then
+        makepkg_args+=(--nocheck)
+    fi
+}
+
 hash buildinfo 2>/dev/null || { error "Require buildinfo in path! Aborting..."; exit 1; }
 
 # Default options
@@ -494,27 +518,7 @@ elif [[ -r "$HOME/.repro.conf" ]]; then
 fi
 
 
-while getopts :hdnfo: arg; do
-    case $arg in
-        h) print_help; exit 0;;
-        f) pkgbuild_file=1;;
-        d) run_diffoscope=1;;
-        n) NOCHECK=1;;
-        o) OUTDIR="$OPTARG";;
-        *) ;;
-    esac
-done
-
-makepkg_args=(
-    --syncdeps
-    --clean
-    --noconfirm
-    --skippgpcheck
-)
-
-if ((NOCHECK)); then
-    makepkg_args+=(--nocheck)
-fi
+parse_args "$@"
 
 # Save command args (such as path to .pkg.tar.xz file)
 shift $((OPTIND-1))
