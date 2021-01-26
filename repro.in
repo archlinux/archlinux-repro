@@ -458,7 +458,7 @@ function get_bootstrap_img() {
 function print_help() {
 cat <<__END__
 Usage:
-  repro [options]
+  repro [options] <local-package>
 
 General Options:
  -h                           Print this help message
@@ -487,6 +487,12 @@ function parse_args() {
 
     # Save command args (such as path to .pkg.tar.xz file)
     shift $((OPTIND-1))
+
+    if [[ $# != 1 ]]; then
+        error "too many packages provided"
+        print_help
+	exit 1
+    fi
 
     pkg="$@"
     if [[ ! -f "${pkg}" ]]; then

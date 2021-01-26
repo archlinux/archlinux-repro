@@ -8,7 +8,7 @@ repro - reproducible builds utility
 
 Synopsis
 --------
-'repro' <command> [options]
+'repro' [options] <local-package>
 
 
 Description
