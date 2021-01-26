@@ -485,7 +485,7 @@ function parse_args() {
             d) run_diffoscope=1;;
             n) NOCHECK=1;;
             o) OUTDIR="$OPTARG";;
-            *) ;;
+            *) error "unknown argument ${OPTARG}" ; print_help; exit 1;;
         esac
     done
 
