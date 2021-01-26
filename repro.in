@@ -211,6 +211,8 @@ function init_chroot(){
 
     # Prepare root chroot
     if [ ! -d "$BUILDDIRECTORY"/root ]; then
+        get_bootstrap_img
+
         lock 9 "$BUILDDIRECTORY"/root.lock
         msg "Preparing chroot"
         trap '{ cleanup_root_volume; exit 1; }' ERR
@@ -439,6 +441,8 @@ __END__
 
 # Desc: Fetches a bootstrap image and verifies the signature
 function get_bootstrap_img() {
+    init_gnupg
+
     if [ ! -e "$IMGDIRECTORY/$bootstrap_img" ]; then
         msg "Downloading bootstrap image..."
         ( cd "$IMGDIRECTORY" && curl -f --remote-name-all "$BOOTSTRAPMIRROR/$bootstrap_img"{,.sig} )
@@ -514,8 +518,6 @@ fi
 shift $((OPTIND-1))
 
 check_root NOCHECK,MAKEFLAGS,DEBUG,CACHEDIR
-init_gnupg
-test -d "$BUILDDIRECTORY"/root || get_bootstrap_img
 mkdir -p "$KEYRINGCACHE"
 init_chroot
 cmd_check "$@"
