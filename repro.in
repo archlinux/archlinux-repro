@@ -23,7 +23,7 @@ trap "{ rm -r $IMGDIRECTORY; }" EXIT
 DIFFOSCOPE="diffoscope"
 
 # Turn on/off check in repro
-NOCHECK=${NOCHECK:-""}
+NOCHECK=${NOCHECK:-0}
 
 CACHEDIR="${CACHEDIR:-cache}"
 
@@ -196,7 +196,7 @@ install -d -o builduser -g builduser /pkgdest
 install -d -o builduser -g builduser /srcpkgdest
 install -d -o builduser -g builduser /build
 __END__
-    exec_nspawn "$build" $args sudo -iu builduser bash -c ". /etc/profile; cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg -sc --noconfirm --skippgpcheck ${NOCHECK:+--nocheck}"
+    exec_nspawn "$build" $args sudo -iu builduser bash -c ". /etc/profile; cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg ${makepkg_args[*]}"
     mkdir -p "./build"
     for pkgfile in "$BUILDDIRECTORY/$build"/pkgdest/*; do
         mv "$pkgfile" "./build/"
@@ -463,6 +463,17 @@ while getopts :hdnf arg; do
         *) ;;
     esac
 done
+
+makepkg_args=(
+    --syncdeps
+    --clean
+    --noconfirm
+    --skippgpcheck
+)
+
+if ((NOCHECK)); then
+    makepkg_args+=(--nocheck)
+fi
 
 # Save command args (such as path to .pkg.tar.xz file)
 shift $((OPTIND-1))
