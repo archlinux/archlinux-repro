@@ -23,7 +23,7 @@ trap "{ rm -r $IMGDIRECTORY; }" EXIT
 DIFFOSCOPE="diffoscope"
 
 # Turn on/off check in repro
-NOCHECK=${NOCHECK:-0}
+NOCHECK=${NOCHECK:-""}
 
 CACHEDIR="${CACHEDIR:-cache}"
 
