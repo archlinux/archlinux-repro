@@ -28,6 +28,12 @@ NOCHECK=${NOCHECK:-0}
 CACHEDIR="${CACHEDIR:-cache}"
 OUTDIR="${OUTDIR:-./build}"
 
+# Default options
+run_diffoscope=0
+
+# By default we don't assume a PKGBUILD
+pkgbuild_file=0
+
 makepkg_args=(
     --syncdeps
     --clean
@@ -523,12 +529,6 @@ function source_conf() {
 }
 
 hash buildinfo 2>/dev/null || { error "Require buildinfo in path! Aborting..."; exit 1; }
-
-# Default options
-run_diffoscope=0
-
-# By default we don't assume a PKGBUILD
-pkgbuild_file=0
 
 source_conf
 parse_args "$@"
