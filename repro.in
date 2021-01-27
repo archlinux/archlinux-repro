@@ -88,7 +88,6 @@ function colorize() {
     fi
     readonly ALL_OFF BOLD BLUE GREEN RED YELLOW
 }
-colorize
 
 # Desc: Message format
 function msg() {
@@ -528,6 +527,7 @@ function source_conf() {
     fi
 }
 
+colorize
 source_conf
 parse_args "$@"
 check_root NOCHECK,MAKEFLAGS,DEBUG,CACHEDIR
