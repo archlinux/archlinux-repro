@@ -502,6 +502,26 @@ function parse_args() {
     fi
 }
 
+function source_conf() {
+    local repro_conf
+    local xdg_repro_dir
+
+    repro_conf=$CONFIGDIR/repro.conf
+    if [[ -r $repro_conf ]]; then
+        # shellcheck source=/dev/null
+        source "$repro_conf"
+    fi
+
+    xdg_repro_dir="${XDG_CONFIG_HOME:-$HOME/.config}/archlinux-repro"
+    if [[ -r "$xdg_repro_dir/repro.conf" ]]; then
+        # shellcheck source=/dev/null
+        source "$xdg_repro_dir/repro.conf"
+    elif [[ -r "$HOME/.repro.conf" ]]; then
+        # shellcheck source=/dev/null
+        source "$HOME/.repro.conf"
+    fi
+}
+
 hash buildinfo 2>/dev/null || { error "Require buildinfo in path! Aborting..."; exit 1; }
 
 # Default options
@@ -510,22 +530,7 @@ run_diffoscope=0
 # By default we don't assume a PKGBUILD
 pkgbuild_file=0
 
-repro_conf=$CONFIGDIR/repro.conf
-if [[ -r $repro_conf ]]; then
-    # shellcheck source=/dev/null
-    source "$repro_conf"
-fi
-
-xdg_repro_dir="${XDG_CONFIG_HOME:-$HOME/.config}/archlinux-repro"
-if [[ -r "$xdg_repro_dir/repro.conf" ]]; then
-    # shellcheck source=/dev/null
-    source "$xdg_repro_dir/repro.conf"
-elif [[ -r "$HOME/.repro.conf" ]]; then
-    # shellcheck source=/dev/null
-    source "$HOME/.repro.conf"
-fi
-
-
+source_conf
 parse_args "$@"
 check_root NOCHECK,MAKEFLAGS,DEBUG,CACHEDIR
 init_chroot
