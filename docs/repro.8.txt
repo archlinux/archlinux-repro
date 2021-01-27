@@ -40,6 +40,10 @@ Options
 *-n*::
         When enabled makepkg runs with --nocheck.
 
+*-o*::
+        Set the output directory for the rebuilt packages. Defaults to
+        `./build`.
+
 See Also
 --------
 linkman:makepkg[8]

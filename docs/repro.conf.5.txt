@@ -54,6 +54,9 @@ Options
 **CACHEDIR=**cache::
         Choose the cache directory location. The default creates a cache in the working directory.
 
+**OUTDIR=**./build::
+        Choose the build output directory. The default creates `./build` in the working directory.
+
 See Also
 --------
 linkman:repro[8]

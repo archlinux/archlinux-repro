@@ -24,8 +24,8 @@ DIFFOSCOPE="diffoscope"
 
 # Turn on/off check in repro
 NOCHECK=${NOCHECK:-""}
-
 CACHEDIR="${CACHEDIR:-cache}"
+OUTDIR="${OUTDIR:-./build}"
 
 # Desc: Escalates privileges
 orig_argv=("$0" "$@")
@@ -197,11 +197,11 @@ install -d -o builduser -g builduser /srcpkgdest
 install -d -o builduser -g builduser /build
 __END__
     exec_nspawn "$build" $args sudo -iu builduser bash -c ". /etc/profile; cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg -sc --noconfirm --skippgpcheck ${NOCHECK:+--nocheck}"
-    mkdir -p "./build"
+    mkdir -p "$OUTDIR"
     for pkgfile in "$BUILDDIRECTORY/$build"/pkgdest/*; do
-        mv "$pkgfile" "./build/"
+        mv "$pkgfile" "$OUTDIR/"
     done
-    chown -R "$src_owner" "./build"
+    chown -R "$src_owner" "$OUTDIR"
 }
 
 # Desc: Sets up a container with the correct files
@@ -392,13 +392,13 @@ __END__
     chown -R "$src_owner" "${cachedir}"
 
     msg "Comparing hashes..."
-    if diff -q -- "$pkg" ./build/"$(basename "$pkg")" > /dev/null ; then
+    if diff -q -- "$pkg" "$OUTDIR/$(basename "$pkg")" > /dev/null ; then
       msg "Package is reproducible!"
       exit 0
     else
       error "Package is not reproducible"
       if ((run_diffoscope)); then
-          PYTHONIOENCODING=utf-8 $DIFFOSCOPE "$pkg" ./build/"$(basename "$pkg")" || true
+          PYTHONIOENCODING=utf-8 $DIFFOSCOPE "$pkg" "$OUTDIR/$(basename "$pkg")" || true
       fi
       exit 1
     fi
@@ -427,6 +427,7 @@ General Options:
  -d                           Run diffoscope if packages are not reproducible
  -f                           Use the local PKGBUILD for building
  -n                           Run makepkg with --nocheck
+ -o <path>                    Set the output directory (default: ./build)
 __END__
 }
 
@@ -454,12 +455,13 @@ elif [[ -r "$HOME/.repro.conf" ]]; then
 fi
 
 
-while getopts :hdnf arg; do
+while getopts :hdnfo: arg; do
     case $arg in
         h) print_help; exit 0;;
         f) pkgbuild_file=1;;
         d) run_diffoscope=1;;
         n) NOCHECK=1;;
+        o) OUTDIR="$OPTARG";;
         *) ;;
     esac
 done
