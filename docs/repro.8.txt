@@ -37,6 +37,9 @@ Options
         directory. This one is used to build the package instead of checking out
         a PKGBUILD from asp.
 
+*-n*::
+        When enabled makepkg runs with --nocheck.
+
 See Also
 --------
 linkman:makepkg[8]
