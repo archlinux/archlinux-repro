@@ -228,7 +228,7 @@ function init_chroot(){
         msg2 "Setting up keyring, this might take a while..."
         exec_nspawn root pacman-key --init &> /dev/null
         exec_nspawn root pacman-key --populate archlinux &> /dev/null
-        exec_nspawn root pacman -Sy
+        exec_nspawn root pacman -Syu --noconfirm
         touch "$BUILDDIRECTORY/root/.repro-1"
         lock_close 9
     else
