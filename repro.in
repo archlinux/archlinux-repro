@@ -237,6 +237,7 @@ function init_chroot(){
         exit 1
       fi
       if lock 9 "$BUILDDIRECTORY"/root.lock; then
+          msg "Reusing existing container"
           printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
           exec_nspawn root pacman -Syu --noconfirm
           lock_close 9
@@ -298,6 +299,7 @@ function cmd_check(){
 
     # Father I have sinned
     if ((!pkgbuild_file)); then
+    msg2 "Fetching PKGBUILD from ASP..."
     EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}/startdir:/startdir" --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
     bash <<-__END__
 shopt -s globstar
