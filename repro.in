@@ -301,8 +301,7 @@ function cmd_check(){
     EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}/startdir:/startdir" --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
     bash <<-__END__
 shopt -s globstar
-pacman -S asp devtools --noconfirm
-cp /usr/share/devtools/makepkg-x86_64.conf /etc/makepkg.conf
+pacman -S asp --noconfirm --needed
 asp checkout $pkgbase
 pushd $pkgbase
 for rev in \$(git rev-list --all -- repos/); do
