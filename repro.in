@@ -230,6 +230,7 @@ function init_chroot(){
         exec_nspawn root pacman-key --init &> /dev/null
         exec_nspawn root pacman-key --populate archlinux &> /dev/null
         exec_nspawn root pacman -Sy
+        exec_nspawn root pacman -Syu --noconfirm
         touch "$BUILDDIRECTORY/root/.repro-2"
         lock_close 9
     else
@@ -238,6 +239,7 @@ function init_chroot(){
         exit 1
       fi
       if lock 9 "$BUILDDIRECTORY"/root.lock; then
+          msg "Reusing existing container"
           printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
           exec_nspawn root pacman -Syu --noconfirm
           lock_close 9
@@ -299,11 +301,11 @@ function cmd_check(){
 
     # Father I have sinned
     if ((!pkgbuild_file)); then
+    msg2 "Fetching PKGBUILD from ASP..."
     EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}/startdir:/startdir" --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
     bash <<-__END__
 shopt -s globstar
-pacman -S asp devtools --noconfirm
-cp /usr/share/devtools/makepkg-x86_64.conf /etc/makepkg.conf
+pacman -S asp --noconfirm --needed
 asp checkout $pkgbase
 pushd $pkgbase
 for rev in \$(git rev-list --all -- repos/); do
