@@ -28,6 +28,19 @@ NOCHECK=${NOCHECK:-0}
 CACHEDIR="${CACHEDIR:-cache}"
 OUTDIR="${OUTDIR:-./build}"
 
+# Default options
+run_diffoscope=0
+
+# By default we don't assume a PKGBUILD
+pkgbuild_file=0
+
+makepkg_args=(
+    --syncdeps
+    --clean
+    --noconfirm
+    --skippgpcheck
+)
+
 # Desc: Escalates privileges
 orig_argv=("$0" "$@")
 src_owner=${SUDO_USER:-$USER}
@@ -47,12 +60,12 @@ function gpg() {
 }
 
 function init_gnupg() {
-    [ ! -d "$BUILDDIRECTORY/_gnupg" ] && mkdir -p "$BUILDDIRECTORY/_gnupg"
+    mkdir -p "$BUILDDIRECTORY/_gnupg"
 
     # ensure signing key is available
     # We try WKD first, then fallback to keyservers.
     # This works on debian./
-    gpg --keyserver=p80.pool.sks-keyservers.net --auto-key-locate wkd,keyserver --locate-keys pierre@archlinux.de &>/dev/null
+    gpg --keyserver=p80.pool.sks-keyservers.net --auto-key-locate wkd,keyserver --locate-keys pierre@archlinux.de
 }
 
 # Desc: Sets the appropriate colors for output
@@ -75,7 +88,6 @@ function colorize() {
     fi
     readonly ALL_OFF BOLD BLUE GREEN RED YELLOW
 }
-colorize
 
 # Desc: Message format
 function msg() {
@@ -207,12 +219,12 @@ __END__
 
 # Desc: Sets up a container with the correct files
 function init_chroot(){
-    set -e
-
-    [ ! -d "$BUILDDIRECTORY" ] && mkdir -p "$BUILDDIRECTORY"
+    mkdir -p "$BUILDDIRECTORY"
 
     # Prepare root chroot
     if [ ! -d "$BUILDDIRECTORY"/root ]; then
+        get_bootstrap_img
+
         lock 9 "$BUILDDIRECTORY"/root.lock
         msg "Preparing chroot"
         trap '{ cleanup_root_volume; exit 1; }' ERR
@@ -251,18 +263,10 @@ function init_chroot(){
 }
 
 # Desc: Reproduces a package
-# 1: Location of package
 function cmd_check(){
-    local pkg="${1}"
     local cachedir="${CACHEDIR}"
 
-    if [[ ! -f "${pkg}" ]]; then
-      error "no package file given"
-      exit 1
-    fi
-
     trap - ERR INT
-
 
     declare -A buildinfo
     while IFS=$'=' read -r key value; do
@@ -336,6 +340,8 @@ __END__
 
     # shellcheck disable=SC2086
     keyring_package="$(printf -- '%s\n' ${installed[*]} | grep -E "archlinux-keyring")"
+
+    mkdir -p "$KEYRINGCACHE"
 
     if [ ! -d "$KEYRINGCACHE/$keyring_package" ]; then
       msg2 "Setting up $keyring_package in keyring cache, this might take a while..."
@@ -441,6 +447,8 @@ __END__
 
 # Desc: Fetches a bootstrap image and verifies the signature
 function get_bootstrap_img() {
+    init_gnupg
+
     if [ ! -e "$IMGDIRECTORY/$bootstrap_img" ]; then
         msg "Downloading bootstrap image..."
         ( cd "$IMGDIRECTORY" && curl -f --remote-name-all "$BOOTSTRAPMIRROR/$bootstrap_img"{,.sig} )
@@ -455,7 +463,7 @@ function get_bootstrap_img() {
 function print_help() {
 cat <<__END__
 Usage:
-  repro [options]
+  repro [options] <local-package>
 
 General Options:
  -h                           Print this help message
@@ -466,58 +474,62 @@ General Options:
 __END__
 }
 
-hash buildinfo 2>/dev/null || { error "Require buildinfo in path! Aborting..."; exit 1; }
+function parse_args() {
+    while getopts :hdnf arg; do
+        case $arg in
+            h) print_help; exit 0;;
+            f) pkgbuild_file=1;;
+            d) run_diffoscope=1;;
+            n) NOCHECK=1;;
+            o) OUTDIR="$OPTARG";;
+            *) error "unknown argument ${OPTARG}" ; print_help; exit 1;;
+        esac
+    done
 
-# Default options
-run_diffoscope=0
+    if ((NOCHECK)); then
+        makepkg_args+=(--nocheck)
+    fi
 
-# By default we don't assume a PKGBUILD
-pkgbuild_file=0
+    # Save command args (such as path to .pkg.tar.xz file)
+    shift $((OPTIND-1))
 
-repro_conf=$CONFIGDIR/repro.conf
-if [[ -r $repro_conf ]]; then
-    # shellcheck source=/dev/null
-    source "$repro_conf"
-fi
+    if [[ $# != 1 ]]; then
+        error "too many packages provided"
+        print_help
+	exit 1
+    fi
 
-xdg_repro_dir="${XDG_CONFIG_HOME:-$HOME/.config}/archlinux-repro"
-if [[ -r "$xdg_repro_dir/repro.conf" ]]; then
-    # shellcheck source=/dev/null
-    source "$xdg_repro_dir/repro.conf"
-elif [[ -r "$HOME/.repro.conf" ]]; then
-    # shellcheck source=/dev/null
-    source "$HOME/.repro.conf"
-fi
+    pkg="$@"
+    if [[ ! -f "${pkg}" ]]; then
+        error "argument provided ${pkg} isn't a valid file"
+        print_help
+        exit 1
+    fi
+}
 
+function source_conf() {
+    local repro_conf
+    local xdg_repro_dir
 
-while getopts :hdnfo: arg; do
-    case $arg in
-        h) print_help; exit 0;;
-        f) pkgbuild_file=1;;
-        d) run_diffoscope=1;;
-        n) NOCHECK=1;;
-        o) OUTDIR="$OPTARG";;
-        *) ;;
-    esac
-done
+    repro_conf=$CONFIGDIR/repro.conf
+    if [[ -r $repro_conf ]]; then
+        # shellcheck source=/dev/null
+        source "$repro_conf"
+    fi
 
-makepkg_args=(
-    --syncdeps
-    --clean
-    --noconfirm
-    --skippgpcheck
-)
+    xdg_repro_dir="${XDG_CONFIG_HOME:-$HOME/.config}/archlinux-repro"
+    if [[ -r "$xdg_repro_dir/repro.conf" ]]; then
+        # shellcheck source=/dev/null
+        source "$xdg_repro_dir/repro.conf"
+    elif [[ -r "$HOME/.repro.conf" ]]; then
+        # shellcheck source=/dev/null
+        source "$HOME/.repro.conf"
+    fi
+}
 
-if ((NOCHECK)); then
-    makepkg_args+=(--nocheck)
-fi
-
-# Save command args (such as path to .pkg.tar.xz file)
-shift $((OPTIND-1))
-
+colorize
+source_conf
+parse_args "$@"
 check_root NOCHECK,MAKEFLAGS,DEBUG,CACHEDIR
-init_gnupg
-test -d "$BUILDDIRECTORY"/root || get_bootstrap_img
-test -d "$KEYRINGCACHE" || mkdir -p "$KEYRINGCACHE"
 init_chroot
-cmd_check "$@"
+cmd_check
