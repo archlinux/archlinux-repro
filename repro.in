@@ -118,29 +118,29 @@ function error() {
 }
 
 ##
-#  usage : lock( $fd, $file, $message, [ $message_arguments... ] )
+#  usage : elock( $fd, $file, $message, [ $message_arguments... ] )
 ##
-lock() {
+elock() {
     # Only reopen the FD if it wasn't handed to us
     if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
         mkdir -p -- "$(dirname -- "$2")"
         eval "exec $1>"'"$2"'
     fi
 
-    flock -n "$1"
+    flock -e "$1"
 }
 
 ##
 #  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
 ##
-nlock() {
+slock() {
     # Only reopen the FD if it wasn't handed to us
     if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
         mkdir -p -- "$(dirname -- "$2")"
         eval "exec $1>"'"$2"'
     fi
 
-    flock "$1"
+    flock -s "$1"
 }
 
 ##
@@ -158,6 +158,9 @@ lock_close() {
 # 2: Command to execute
 function exec_nspawn(){
     local container=$1
+    if ((EPHEMERAL)); then
+      slock 8 "$BUILDDIRECTORY/$build.lock"
+    fi
     systemd-nspawn -q \
       --as-pid2 \
       --register=no \
@@ -165,6 +168,9 @@ function exec_nspawn(){
       --pipe \
       -E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
       -D "$BUILDDIRECTORY/$container" "${@:2}"
+    if ((EPHEMERAL)); then
+      lock_close 8 "$BUILDDIRECTORY/$build.lock"
+    fi
 }
 
 # Desc: Removes the root container
@@ -223,9 +229,12 @@ function init_chroot(){
 
     # Prepare root chroot
     if [ ! -d "$BUILDDIRECTORY"/root ]; then
+        # Acquire lock early
+        mkdir -p "$BUILDDIRECTORY/root"
+        elock 9 "$BUILDDIRECTORY"/root.lock
+
         get_bootstrap_img
 
-        lock 9 "$BUILDDIRECTORY"/root.lock
         msg "Preparing chroot"
         trap '{ cleanup_root_volume; exit 1; }' ERR
         trap '{ cleanup_root_volume; trap - INT; kill -INT $$; }' INT
@@ -246,11 +255,11 @@ function init_chroot(){
         touch "$BUILDDIRECTORY/root/.repro-2"
         lock_close 9
     else
-      if [ ! -f "$BUILDDIRECTORY/root/.repro-2" ]; then
-        error "Please delete $BUILDDIRECTORY and initialize the chroots again"
-        exit 1
-      fi
-      if lock 9 "$BUILDDIRECTORY"/root.lock; then
+      if elock 9 "$BUILDDIRECTORY"/root.lock; then
+          if [ ! -f "$BUILDDIRECTORY/root/.repro-2" ]; then
+            error "Please delete $BUILDDIRECTORY and initialize the chroots again"
+            exit 1
+          fi
           msg "Reusing existing container"
           printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
           exec_nspawn root pacman -Syu --noconfirm
@@ -306,6 +315,10 @@ function cmd_check(){
     # Father I have sinned
     if ((!pkgbuild_file)); then
     msg2 "Fetching PKGBUILD from ASP..."
+
+    # Lock the cachedir as we might have a race condition with pacman -S and the cachedir
+    elock 9 "${cachedir}.lock"
+
     EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}/startdir:/startdir" --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
     bash <<-__END__
 shopt -s globstar
@@ -323,6 +336,7 @@ for rev in \$(git rev-list --all -- repos/); do
 done
 exit 1
 __END__
+    lock_close 9 "${cachedir}.lock"
   elif [[ -r "PKGBUILD" ]]; then
     if [[ "$(sha256sum PKGBUILD | awk '{print $1}')" != "$pkgbuild_sha256sum" ]]; then
       error "PKGBUILD doesn't match the checksum"
@@ -344,54 +358,57 @@ __END__
     mkdir -p "$KEYRINGCACHE"
 
     if [ ! -d "$KEYRINGCACHE/$keyring_package" ]; then
+      mkdir -p "$KEYRINGCACHE/$keyring_package"
       msg2 "Setting up $keyring_package in keyring cache, this might take a while..."
 
-      nlock 9 "$KEYRINGCACHE/$keyring_package.lock"
-      # shellcheck disable=SC2086
-      keyring=$(printf -- '%s\n' ${packages[*]} | grep -E "archlinux-keyring")
-      EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}:/mnt" --bind="$(readlink -e "${cachedir}"):/cache" bash -c \
-          'pacstrap -U /mnt "$@"' -bash "${keyring}" &>/dev/null
+      if elock 9 "$KEYRINGCACHE/$keyring_package.lock"; then
+        # shellcheck disable=SC2086
+        keyring=$(printf -- '%s\n' ${packages[*]} | grep -E "archlinux-keyring")
+        EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}:/mnt" --bind="$(readlink -e "${cachedir}"):/cache" bash -c \
+            'pacstrap -U /mnt "$@"' -bash "${keyring}" &>/dev/null
 
-      mkdir -p "$KEYRINGCACHE/$keyring_package"
-      trap "{ rm -rf $KEYRINGCACHE/$keyring_package ; exit 1; }" ERR INT
+        trap "{ rm -rf $KEYRINGCACHE/$keyring_package ; exit 1; }" ERR INT
 
-      # We have to rewind time for gpg when building a package so that
-      # signatures which were valid at the time the package was built
-      # are still considered valid now, even if e.g. one of the keys
-      # has since expired.
-      #
-      # However, gpg is finicky about time. Signatures which appear to
-      # be created in the future, or by a key created in the future,
-      # will be ignored. Keys which appear to be created in the future
-      # cannot be signed. To make things work we need to create the
-      # local master key and sign everything at a time after every key
-      # in the keyring exists, but before any packages that depend on
-      # it could have been built.
-      #
-      # Do this by using precisely the time that the keyring package
-      # was built.
+        # We have to rewind time for gpg when building a package so that
+        # signatures which were valid at the time the package was built
+        # are still considered valid now, even if e.g. one of the keys
+        # has since expired.
+        #
+        # However, gpg is finicky about time. Signatures which appear to
+        # be created in the future, or by a key created in the future,
+        # will be ignored. Keys which appear to be created in the future
+        # cannot be signed. To make things work we need to create the
+        # local master key and sign everything at a time after every key
+        # in the keyring exists, but before any packages that depend on
+        # it could have been built.
+        #
+        # Do this by using precisely the time that the keyring package
+        # was built.
 
-      keyring_build_date="$(buildinfo -f builddate "${cachedir}/${keyring##*/}")"
+        keyring_build_date="$(buildinfo -f builddate "${cachedir}/${keyring##*/}")"
 
-      # Note that while we leave faked-system-time in gpg.conf, this
-      # will be overridden during the actual build by adding another
-      # faked-system-time line to the end of the file, which takes
-      # precedence.
-      EPHEMERAL=1 exec_nspawn root \
-        --bind="$KEYRINGCACHE/$keyring_package:/mnt" \
-        --bind="${build_root_dir}/usr/share/pacman/keyrings:/usr/share/pacman/keyrings" \
-        -E PACMAN_KEYRING_DIR=/mnt \
-        bash &> /dev/null <<-__END__
+        # Note that while we leave faked-system-time in gpg.conf, this
+        # will be overridden during the actual build by adding another
+        # faked-system-time line to the end of the file, which takes
+        # precedence.
+        EPHEMERAL=1 exec_nspawn root \
+          --bind="$KEYRINGCACHE/$keyring_package:/mnt" \
+          --bind="${build_root_dir}/usr/share/pacman/keyrings:/usr/share/pacman/keyrings" \
+          -E PACMAN_KEYRING_DIR=/mnt \
+          bash &> /dev/null <<-__END__
 echo "faked-system-time ${keyring_build_date}" >> /mnt/gpg.conf
 pacman-key --init
 pacman-key --populate archlinux
 __END__
-      lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
-      trap - ERR INT
+        lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
+        trap - ERR INT
+      fi
     else
       msg2 "Found $keyring_package in keyring cache"
     fi
 
+    # Acquire shared locks for keyring as it could still be initialized at this point
+    slock 9 "$KEYRINGCACHE/$keyring_package.lock"
     msg "Installing packages"
     # shellcheck disable=SC2086
     EPHEMERAL=1 exec_nspawn root \
@@ -404,6 +421,7 @@ cp --target-directory=/etc/pacman.d/ --recursive /gnupg
 echo "faked-system-time ${SOURCE_DATE_EPOCH}" >> /etc/pacman.d/gnupg/gpg.conf
 pacstrap -G -U /mnt --needed "\$@"
 __END__
+    lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
 
     # Setup environment
     {
@@ -496,7 +514,7 @@ function parse_args() {
     if [[ $# != 1 ]]; then
         error "too many packages provided"
         print_help
-	exit 1
+        exit 1
     fi
 
     pkg="$@"
