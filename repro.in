@@ -327,6 +327,10 @@ function cmd_check(){
     # Father I have sinned
     if ((!pkgbuild_file)); then
     msg2 "Fetching PKGBUILD from ASP..."
+
+    # Lock the cachedir as we might have a race condition with pacman -S and the cachedir
+    lock 9 "${cachedir}.lock"
+
     EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}/startdir:/startdir" --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
     bash <<-__END__
 shopt -s globstar
@@ -344,6 +348,7 @@ for rev in \$(git rev-list --all -- repos/); do
 done
 exit 1
 __END__
+    lock_close 9 "${cachedir}.lock"
   elif [[ -r "PKGBUILD" ]]; then
     if [[ "$(sha256sum PKGBUILD | awk '{print $1}')" != "$pkgbuild_sha256sum" ]]; then
       error "PKGBUILD doesn't match the checksum"
