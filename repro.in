@@ -260,8 +260,6 @@ function init_chroot(){
         msg2 "Setting up keyring, this might take a while..."
         exec_nspawn root pacman-key --init &> /dev/null
         exec_nspawn root pacman-key --populate archlinux &> /dev/null
-        exec_nspawn root pacman -Sy
-        exec_nspawn root pacman -Syu --noconfirm
         touch "$BUILDDIRECTORY/root/.repro-2"
         lock_close 9
     else
@@ -269,14 +267,14 @@ function init_chroot(){
         error "Please delete $BUILDDIRECTORY and initialize the chroots again"
         exit 1
       fi
-      if nlock 9 "$BUILDDIRECTORY"/root.lock; then
-          msg "Reusing existing container"
-          printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
-          exec_nspawn root pacman -Syu --noconfirm
-          lock_close 9
-      else
-          msg "Couldn't acquire lock on root chroot, didn't update."
-      fi
+      msg "Reusing existing container"
+    fi
+    if nlock 9 "$BUILDDIRECTORY"/root.lock; then
+      printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
+      exec_nspawn root pacman -Syu --noconfirm
+      lock_close 9
+    else
+      msg "Couldn't acquire lock on root chroot, didn't update."
     fi
     trap - ERR INT
 }
