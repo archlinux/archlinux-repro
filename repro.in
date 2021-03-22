@@ -118,9 +118,11 @@ function error() {
 }
 
 ##
-#  usage : lock( $fd, $file, $message, [ $message_arguments... ] )
+#  usage : nlock( $fd, $file, $message, [ $message_arguments... ] )
+#
+# Desc: non-blocking exclusive (write) lock
 ##
-lock() {
+nlock() {
     # Only reopen the FD if it wasn't handed to us
     if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
         mkdir -p -- "$(dirname -- "$2")"
@@ -131,9 +133,26 @@ lock() {
 }
 
 ##
-#  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
+#  usage : lock( $fd, $file, $message, [ $message_arguments... ] )
+#
+# Desc: normal - blocking exclusive (write) lock
 ##
-nlock() {
+lock() {
+    # Only reopen the FD if it wasn't handed to us
+    if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
+        mkdir -p -- "$(dirname -- "$2")"
+        eval "exec $1>"'"$2"'
+    fi
+
+    flock "$1"
+}
+
+##
+#  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
+#
+# Desc: blocking shared (read) lock
+##
+slock() {
     # Only reopen the FD if it wasn't handed to us
     if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
         mkdir -p -- "$(dirname -- "$2")"
@@ -225,7 +244,7 @@ function init_chroot(){
     if [ ! -d "$BUILDDIRECTORY"/root ]; then
         get_bootstrap_img
 
-        lock 9 "$BUILDDIRECTORY"/root.lock
+        nlock 9 "$BUILDDIRECTORY"/root.lock
         msg "Preparing chroot"
         trap '{ cleanup_root_volume; exit 1; }' ERR
         trap '{ cleanup_root_volume; trap - INT; kill -INT $$; }' INT
@@ -250,7 +269,7 @@ function init_chroot(){
         error "Please delete $BUILDDIRECTORY and initialize the chroots again"
         exit 1
       fi
-      if lock 9 "$BUILDDIRECTORY"/root.lock; then
+      if nlock 9 "$BUILDDIRECTORY"/root.lock; then
           msg "Reusing existing container"
           printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
           exec_nspawn root pacman -Syu --noconfirm
@@ -346,7 +365,7 @@ __END__
     if [ ! -d "$KEYRINGCACHE/$keyring_package" ]; then
       msg2 "Setting up $keyring_package in keyring cache, this might take a while..."
 
-      nlock 9 "$KEYRINGCACHE/$keyring_package.lock"
+      slock 9 "$KEYRINGCACHE/$keyring_package.lock"
       # shellcheck disable=SC2086
       keyring=$(printf -- '%s\n' ${packages[*]} | grep -E "archlinux-keyring")
       EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}:/mnt" --bind="$(readlink -e "${cachedir}"):/cache" bash -c \
