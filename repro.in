@@ -177,13 +177,28 @@ lock_close() {
 # 2: Command to execute
 function exec_nspawn(){
     local container=$1
+
+    # EPHEMERAL in systemd-nspawn uses implicit overlayfs mounts to provide
+    # the container. If the root container is being updated or files are in
+    # the lower directory disappear the results are unspecified and might
+    # cause weird behaviour.
+    #
+    # Thus we acquire read locks on the build container to ensure nothing gets
+    # a write lock. The code is weird because the locking mechanism here is
+    # implicit as opposed to explicit in the top level of cmd_check.
+    if ((EPHEMERAL)); then
+        slock 8 "$BUILDDIRECTORY/$build.lock"
+    fi
     systemd-nspawn -q \
-      --as-pid2 \
-      --register=no \
-      ${EPHEMERAL:+--ephemeral} \
-      --pipe \
-      -E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
-      -D "$BUILDDIRECTORY/$container" "${@:2}"
+        --as-pid2 \
+        --register=no \
+        ${EPHEMERAL:+--ephemeral} \
+        --pipe \
+        -E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
+        -D "$BUILDDIRECTORY/$container" "${@:2}"
+    if ((EPHEMERAL)); then
+        lock_close 8 "$BUILDDIRECTORY/$build.lock"
+    fi
 }
 
 # Desc: Removes the root container
