@@ -159,7 +159,7 @@ slock() {
         eval "exec $1>"'"$2"'
     fi
 
-    flock "$1"
+    flock -s "$1"
 }
 
 ##
@@ -369,10 +369,13 @@ __END__
 
     mkdir -p "$KEYRINGCACHE"
 
+    # Always lock first. Otherwise we might end up...
+    # - doing the same thing again - if using test/lock/mkdir
+    # - with empty directory in the follow-up lock - if using test/mkdir/lock
+    lock 9 "$KEYRINGCACHE/$keyring_package.lock"
     if [ ! -d "$KEYRINGCACHE/$keyring_package" ]; then
       msg2 "Setting up $keyring_package in keyring cache, this might take a while..."
 
-      slock 9 "$KEYRINGCACHE/$keyring_package.lock"
       # shellcheck disable=SC2086
       keyring=$(printf -- '%s\n' ${packages[*]} | grep -E "archlinux-keyring")
       EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}:/mnt" --bind="$(readlink -e "${cachedir}"):/cache" bash -c \
@@ -412,12 +415,14 @@ echo "faked-system-time ${keyring_build_date}" >> /mnt/gpg.conf
 pacman-key --init
 pacman-key --populate archlinux
 __END__
-      lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
       trap - ERR INT
     else
       msg2 "Found $keyring_package in keyring cache"
     fi
+    lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
 
+    # Acquire shared locks for keyring as it could still be initialized at this point
+    slock 9 "$KEYRINGCACHE/$keyring_package.lock"
     msg "Installing packages"
     # shellcheck disable=SC2086
     EPHEMERAL=1 exec_nspawn root \
@@ -430,6 +435,7 @@ cp --target-directory=/etc/pacman.d/ --recursive /gnupg
 echo "faked-system-time ${SOURCE_DATE_EPOCH}" >> /etc/pacman.d/gnupg/gpg.conf
 pacstrap -G -U /mnt --needed "\$@"
 __END__
+    lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
 
     # Setup environment
     {
