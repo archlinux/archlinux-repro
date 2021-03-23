@@ -240,11 +240,13 @@ __END__
 function init_chroot(){
     mkdir -p "$BUILDDIRECTORY"
 
-    # Prepare root chroot
+    # Always lock first. Otherwise we might end up...
+    # - doing the same thing again - if using test/lock/mkdir
+    # - with empty directory in the follow-up lock - if using test/mkdir/lock
+    lock 9 "$BUILDDIRECTORY"/root.lock
     if [ ! -d "$BUILDDIRECTORY"/root ]; then
         get_bootstrap_img
 
-        nlock 9 "$BUILDDIRECTORY"/root.lock
         msg "Preparing chroot"
         trap '{ cleanup_root_volume; exit 1; }' ERR
         trap '{ cleanup_root_volume; trap - INT; kill -INT $$; }' INT
@@ -261,7 +263,6 @@ function init_chroot(){
         exec_nspawn root pacman-key --init &> /dev/null
         exec_nspawn root pacman-key --populate archlinux &> /dev/null
         touch "$BUILDDIRECTORY/root/.repro-2"
-        lock_close 9
     else
       if [ ! -f "$BUILDDIRECTORY/root/.repro-2" ]; then
         error "Please delete $BUILDDIRECTORY and initialize the chroots again"
@@ -269,12 +270,15 @@ function init_chroot(){
       fi
       msg "Reusing existing container"
     fi
+    lock_close 9
+
     if nlock 9 "$BUILDDIRECTORY"/root.lock; then
+      msg "Updating container"
       printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
       exec_nspawn root pacman -Syu --noconfirm
       lock_close 9
     else
-      msg "Couldn't acquire lock on root chroot, didn't update."
+      msg "Couldn't acquire container lock, didn't update."
     fi
     trap - ERR INT
 }
