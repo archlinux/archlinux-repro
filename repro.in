@@ -187,7 +187,7 @@ function exec_nspawn(){
     # a write lock. The code is weird because the locking mechanism here is
     # implicit as opposed to explicit in the top level of cmd_check.
     if ((EPHEMERAL)); then
-        slock 8 "$BUILDDIRECTORY/$build.lock"
+        slock 8 "$BUILDDIRECTORY/$container.lock"
     fi
     systemd-nspawn -q \
         --as-pid2 \
@@ -197,7 +197,7 @@ function exec_nspawn(){
         -E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
         -D "$BUILDDIRECTORY/$container" "${@:2}"
     if ((EPHEMERAL)); then
-        lock_close 8 "$BUILDDIRECTORY/$build.lock"
+        lock_close 8 "$BUILDDIRECTORY/$container.lock"
     fi
 }
 
