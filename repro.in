@@ -118,9 +118,11 @@ function error() {
 }
 
 ##
-#  usage : lock( $fd, $file, $message, [ $message_arguments... ] )
+#  usage : nlock( $fd, $file, $message, [ $message_arguments... ] )
+#
+# Desc: non-blocking exclusive (write) lock
 ##
-lock() {
+nlock() {
     # Only reopen the FD if it wasn't handed to us
     if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
         mkdir -p -- "$(dirname -- "$2")"
@@ -131,9 +133,11 @@ lock() {
 }
 
 ##
-#  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
+#  usage : lock( $fd, $file, $message, [ $message_arguments... ] )
+#
+# Desc: normal - blocking exclusive (write) lock
 ##
-nlock() {
+lock() {
     # Only reopen the FD if it wasn't handed to us
     if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
         mkdir -p -- "$(dirname -- "$2")"
@@ -141,6 +145,21 @@ nlock() {
     fi
 
     flock "$1"
+}
+
+##
+#  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
+#
+# Desc: blocking shared (read) lock
+##
+slock() {
+    # Only reopen the FD if it wasn't handed to us
+    if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
+        mkdir -p -- "$(dirname -- "$2")"
+        eval "exec $1>"'"$2"'
+    fi
+
+    flock -s "$1"
 }
 
 ##
@@ -158,13 +177,28 @@ lock_close() {
 # 2: Command to execute
 function exec_nspawn(){
     local container=$1
+
+    # EPHEMERAL in systemd-nspawn uses implicit overlayfs mounts to provide
+    # the container. If the root container is being updated or files are in
+    # the lower directory disappear the results are unspecified and might
+    # cause weird behaviour.
+    #
+    # Thus we acquire read locks on the build container to ensure nothing gets
+    # a write lock. The code is weird because the locking mechanism here is
+    # implicit as opposed to explicit in the top level of cmd_check.
+    if ((EPHEMERAL)); then
+        slock 8 "$BUILDDIRECTORY/$container.lock"
+    fi
     systemd-nspawn -q \
-      --as-pid2 \
-      --register=no \
-      ${EPHEMERAL:+--ephemeral} \
-      --pipe \
-      -E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
-      -D "$BUILDDIRECTORY/$container" "${@:2}"
+        --as-pid2 \
+        --register=no \
+        ${EPHEMERAL:+--ephemeral} \
+        --pipe \
+        -E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
+        -D "$BUILDDIRECTORY/$container" "${@:2}"
+    if ((EPHEMERAL)); then
+        lock_close 8 "$BUILDDIRECTORY/$container.lock"
+    fi
 }
 
 # Desc: Removes the root container
@@ -221,11 +255,13 @@ __END__
 function init_chroot(){
     mkdir -p "$BUILDDIRECTORY"
 
-    # Prepare root chroot
+    # Always lock first. Otherwise we might end up...
+    # - doing the same thing again - if using test/lock/mkdir
+    # - with empty directory in the follow-up lock - if using test/mkdir/lock
+    lock 9 "$BUILDDIRECTORY"/root.lock
     if [ ! -d "$BUILDDIRECTORY"/root ]; then
         get_bootstrap_img
 
-        lock 9 "$BUILDDIRECTORY"/root.lock
         msg "Preparing chroot"
         trap '{ cleanup_root_volume; exit 1; }' ERR
         trap '{ cleanup_root_volume; trap - INT; kill -INT $$; }' INT
@@ -241,23 +277,23 @@ function init_chroot(){
         msg2 "Setting up keyring, this might take a while..."
         exec_nspawn root pacman-key --init &> /dev/null
         exec_nspawn root pacman-key --populate archlinux &> /dev/null
-        exec_nspawn root pacman -Sy
-        exec_nspawn root pacman -Syu --noconfirm
         touch "$BUILDDIRECTORY/root/.repro-2"
-        lock_close 9
     else
       if [ ! -f "$BUILDDIRECTORY/root/.repro-2" ]; then
         error "Please delete $BUILDDIRECTORY and initialize the chroots again"
         exit 1
       fi
-      if lock 9 "$BUILDDIRECTORY"/root.lock; then
-          msg "Reusing existing container"
-          printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
-          exec_nspawn root pacman -Syu --noconfirm
-          lock_close 9
-      else
-          msg "Couldn't acquire lock on root chroot, didn't update."
-      fi
+      msg "Reusing existing container"
+    fi
+    lock_close 9
+
+    if nlock 9 "$BUILDDIRECTORY"/root.lock; then
+      msg "Updating container"
+      printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
+      exec_nspawn root pacman -Syu --noconfirm
+      lock_close 9
+    else
+      msg "Couldn't acquire container lock, didn't update."
     fi
     trap - ERR INT
 }
@@ -306,6 +342,10 @@ function cmd_check(){
     # Father I have sinned
     if ((!pkgbuild_file)); then
     msg2 "Fetching PKGBUILD from ASP..."
+
+    # Lock the cachedir as we might have a race condition with pacman -S and the cachedir
+    lock 9 "${cachedir}.lock"
+
     EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}/startdir:/startdir" --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
     bash <<-__END__
 shopt -s globstar
@@ -323,6 +363,7 @@ for rev in \$(git rev-list --all -- repos/); do
 done
 exit 1
 __END__
+    lock_close 9 "${cachedir}.lock"
   elif [[ -r "PKGBUILD" ]]; then
     if [[ "$(sha256sum PKGBUILD | awk '{print $1}')" != "$pkgbuild_sha256sum" ]]; then
       error "PKGBUILD doesn't match the checksum"
@@ -343,10 +384,13 @@ __END__
 
     mkdir -p "$KEYRINGCACHE"
 
+    # Always lock first. Otherwise we might end up...
+    # - doing the same thing again - if using test/lock/mkdir
+    # - with empty directory in the follow-up lock - if using test/mkdir/lock
+    lock 9 "$KEYRINGCACHE/$keyring_package.lock"
     if [ ! -d "$KEYRINGCACHE/$keyring_package" ]; then
       msg2 "Setting up $keyring_package in keyring cache, this might take a while..."
 
-      nlock 9 "$KEYRINGCACHE/$keyring_package.lock"
       # shellcheck disable=SC2086
       keyring=$(printf -- '%s\n' ${packages[*]} | grep -E "archlinux-keyring")
       EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}:/mnt" --bind="$(readlink -e "${cachedir}"):/cache" bash -c \
@@ -386,12 +430,14 @@ echo "faked-system-time ${keyring_build_date}" >> /mnt/gpg.conf
 pacman-key --init
 pacman-key --populate archlinux
 __END__
-      lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
       trap - ERR INT
     else
       msg2 "Found $keyring_package in keyring cache"
     fi
+    lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
 
+    # Acquire shared locks for keyring as it could still be initialized at this point
+    slock 9 "$KEYRINGCACHE/$keyring_package.lock"
     msg "Installing packages"
     # shellcheck disable=SC2086
     EPHEMERAL=1 exec_nspawn root \
@@ -404,6 +450,7 @@ cp --target-directory=/etc/pacman.d/ --recursive /gnupg
 echo "faked-system-time ${SOURCE_DATE_EPOCH}" >> /etc/pacman.d/gnupg/gpg.conf
 pacstrap -G -U /mnt --needed "\$@"
 __END__
+    lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
 
     # Setup environment
     {
