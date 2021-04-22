@@ -448,12 +448,18 @@ __END__
     EPHEMERAL=1 exec_nspawn root \
       --bind="${build_root_dir}:/mnt" \
       --bind-ro="$KEYRINGCACHE/$keyring_package:/gnupg" \
+      --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
       --bind="$(readlink -e ${cachedir}):/cache" \
       bash -bash "${packages[@]}" <<-__END__
 rm --recursive /etc/pacman.d/gnupg/
 cp --target-directory=/etc/pacman.d/ --recursive /gnupg
 echo "faked-system-time ${SOURCE_DATE_EPOCH}" >> /etc/pacman.d/gnupg/gpg.conf
 pacstrap -G -U /mnt --needed "\$@"
+# Ignore all dependencies since we only want the file
+# Saves us a few seconds and doesn't download a bunch of things
+# we are getting rid off
+pacman --noconfirm --needed -Sddu devtools
+cp -v /usr/share/devtools/makepkg-x86_64.conf /mnt/etc/makepkg.conf
 __END__
     lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
 
@@ -548,7 +554,7 @@ function parse_args() {
     if [[ $# != 1 ]]; then
         error "too many packages provided"
         print_help
-	exit 1
+        exit 1
     fi
 
     pkg="$@"
