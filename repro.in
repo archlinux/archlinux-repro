@@ -533,7 +533,7 @@ __END__
 }
 
 function parse_args() {
-    while getopts :hdnf arg; do
+    while getopts :hdnfo: arg; do
         case $arg in
             h) print_help; exit 0;;
             f) pkgbuild_file=1;;
