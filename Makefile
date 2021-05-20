@@ -17,7 +17,7 @@ docs/repro.%: docs/repro.%.txt docs/asciidoc.conf
 	a2x --no-xmllint --asciidoc-opts="-f docs/asciidoc.conf" -d manpage -f manpage -D docs $<
 
 repro: repro.in
-	m4 -DREPRO_CONFIG_DIR=$(CONFDIR)/$(PROGNM) $< >$@
+	m4 -DREPRO_VERSION=$(TAG) -DREPRO_CONFIG_DIR=$(CONFDIR)/$(PROGNM) $< >$@
 	chmod 755 $@
 
 .PHONY: install
