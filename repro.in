@@ -331,7 +331,7 @@ function cmd_check(){
     pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
 
-    if [[ ${format} -ne 1 ]]; then
+    if [[ ${format} -ne 1 && ${format} -ne 2 ]]; then
       error "unsupported BUILDINFO format or no format definition found, aborting rebuild"
       exit 1
     fi
