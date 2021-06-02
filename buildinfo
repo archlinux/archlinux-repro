@@ -34,7 +34,7 @@ function parse_line () {
 
 	case "${key}" in
 	"format")
-		if [[ ${format} -ne ${val} ]]; then
+		if [[ ${val} -ne 1 && ${val} -ne 2 ]]; then
 			echo "incompatible format (want ${format}, got ${val})" >&2
 			exit 1
 		fi
