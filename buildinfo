@@ -188,7 +188,7 @@ case "${action}" in
 	;;
 "packages")
 	for ipkg in "${installed[@]}"; do
-		select_archive_link "${ipkg}"
+		get_archive_link "${ipkg}"
 	done
 	;;
 "field")
