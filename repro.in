@@ -380,6 +380,7 @@ for rev in \$(git rev-list --all -- repos/); do
         exit 0
     fi
 done
+echo "ERROR: Failed to find commit this was built with (PKGBUILD checksum didn't match any commit)" >&2
 exit 1
 __END__
     lock_close 9 "${cachedir}.lock"
