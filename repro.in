@@ -12,13 +12,11 @@ BUILDDIRECTORY=/var/lib/repro
 
 KEYRINGCACHE="${BUILDDIRECTORY}/keyring"
 
-BOOTSTRAPMIRROR=https://mirror.archlinux.no/iso/latest
+BOOTSTRAPMIRROR="https://europe.mirror.pkgbuild.com/iso/latest"
 readonly bootstrap_img=archlinux-bootstrap-"$(date +%Y.%m)".01-"$(uname -m)".tar.gz
 CONFIGDIR='REPRO_CONFIG_DIR'
 
-# HOSTMIRROR=$(curl -s 'https://www.archlinux.org/mirrorlist/?protocol=https' | awk '/^#Server/ {print $3; exit}')
-## Hardcoded until further notice
-HOSTMIRROR="http://mirror.neuf.no/archlinux/\$repo/os/\$arch"
+HOSTMIRROR="https://europe.mirror.pkgbuild.com/\$repo/os/\$arch"
 
 IMGDIRECTORY=$(mktemp -dt XXXXXXXXXX.arch_img)
 trap "{ rm -r $IMGDIRECTORY; }" EXIT
