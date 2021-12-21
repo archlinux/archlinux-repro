@@ -183,6 +183,9 @@ case "${action}" in
 	echo -e "Build Date         : ${data[builddate]}"
 	echo -e "Build Directory    : ${data[builddir]}"
 	echo -e "Build Environment  : ${buildenv[*]}"
+	echo -e "Build Tool         : ${data[buildtool]}"
+	echo -e "Build Tool Version : ${data[buildtoolver]}"
+	echo -e "Build Directory    : ${data[builddir]}"
 	echo -e "Options            : ${options[*]}"
 	echo -e "Installed Packages : ${#installed[@]}"
 	;;
@@ -208,7 +211,7 @@ case "${action}" in
 	esac
 	;;
 "field_all")
-	for field in pkgname pkgbase pkgver pkgbuild_sha256sum packager builddate builddir format; do
+	for field in pkgname pkgbase pkgver pkgbuild_sha256sum packager builddate builddir format buildtool buildtoolver; do
 		echo -e "${field}=${data[${field}]}"
 	done
 	echo -e "buildenv=${buildenv[*]}"
