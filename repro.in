@@ -260,7 +260,7 @@ install -d -o builduser -g builduser /pkgdest
 install -d -o builduser -g builduser /srcpkgdest
 install -d -o builduser -g builduser /build
 __END__
-    exec_nspawn "$build" $args sudo -iu builduser bash -c ". /etc/profile; cd /startdir; SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH makepkg ${makepkg_args[*]}"
+    exec_nspawn "$build" $args sudo -iu builduser bash -c ". /etc/profile; . /env; cd /startdir; makepkg ${makepkg_args[*]}"
     mkdir -p "$OUTDIR"
     for pkgfile in "$BUILDDIRECTORY/$build"/pkgdest/*; do
         mv "$pkgfile" "$OUTDIR/"
@@ -339,6 +339,8 @@ function cmd_check(){
 
     pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
+    BUILDTOOL=${buildinfo[buildtool]}
+    BUILDTOOLVER=${buildinfo[buildtoolver]}
 
     if [[ ${format} -ne 1 && ${format} -ne 2 ]]; then
       error "unsupported BUILDINFO format or no format definition found, aborting rebuild"
@@ -476,7 +478,7 @@ cp -v /usr/share/devtools/makepkg-x86_64.conf /mnt/etc/makepkg.conf
 __END__
     lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
 
-    # Setup environment
+    # Setup makepkg.conf
     {
         printf 'MAKEFLAGS="%s"\n' "${MAKEFLAGS:--j$(nproc)}"
         printf 'PKGDEST=/pkgdest\n'
@@ -488,6 +490,13 @@ __END__
         printf 'COMPRESSZST=(zstd -c -T0 --ultra -20 -)\n'
         printf 'PKGEXT=".pkg.tar%s"\n' "${pkg##*tar}"
      } >> "$build_root_dir/etc/makepkg.conf"
+
+    # Setup environment variables for makepkg
+    {
+        printf 'export SOURCE_DATE_EPOCH="%s"\n' "${SOURCE_DATE_EPOCH}"
+        printf 'export BUILDTOOL="%s"\n' "${BUILDTOOL}"
+        printf 'export BUILDTOOLVER="%s"\n' "${BUILDTOOLVER}"
+     } >> "$build_root_dir/env"
 
     printf '%s.UTF-8 UTF-8\n' en_US de_DE > "$build_root_dir/etc/locale.gen"
     printf 'LANG=en_US.UTF-8\n' > "$build_root_dir/etc/locale.conf"
