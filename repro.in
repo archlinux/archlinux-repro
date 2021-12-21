@@ -18,6 +18,8 @@ CONFIGDIR='REPRO_CONFIG_DIR'
 
 HOSTMIRROR="https://europe.mirror.pkgbuild.com/\$repo/os/\$arch"
 
+ARCHIVEURL="${ARCH_ARCHIVE_CACHE:-https://archive.archlinux.org/packages}"
+
 IMGDIRECTORY=$(mktemp -dt XXXXXXXXXX.arch_img)
 trap "{ rm -r $IMGDIRECTORY; }" EXIT
 
@@ -336,11 +338,21 @@ function cmd_check(){
     format=${buildinfo[format]}
     installed=${buildinfo[installed]}
 
-
     pkgbuild_sha256sum="${buildinfo[pkgbuild_sha256sum]}"
     SOURCE_DATE_EPOCH="${buildinfo[builddate]}"
     BUILDTOOL=${buildinfo[buildtool]}
     BUILDTOOLVER=${buildinfo[buildtoolver]}
+
+    DEVTOOLS="current devtools (fallback)"
+    DEVTOOLS_PKG="devtools"
+    if [[ -z "${BUILDTOOL}" ]] || [[ "${BUILDTOOL}" = makepkg ]]; then
+      DEVTOOLS="devtools-20210202-3-any"
+      DEVTOOLS_PKG="$ARCHIVEURL/${BUILDTOOL:0:1}/${DEVTOOLS}.pkg.tar${pkg##*tar}"
+    elif [[ "${BUILDTOOL}" = devtools ]] ; then
+      DEVTOOLS="${BUILDTOOL}-${BUILDTOOLVER}"
+      DEVTOOLS_PKG="$ARCHIVEURL/${BUILDTOOL:0:1}/${DEVTOOLS}.pkg.tar${pkg##*tar}"
+    fi
+    msg2 "Using devtools version: %s" "${DEVTOOLS}"
 
     if [[ ${format} -ne 1 && ${format} -ne 2 ]]; then
       error "unsupported BUILDINFO format or no format definition found, aborting rebuild"
@@ -473,7 +485,11 @@ pacstrap -G -U /mnt --needed "\$@"
 # Ignore all dependencies since we only want the file
 # Saves us a few seconds and doesn't download a bunch of things
 # we are getting rid off
-pacman --noconfirm --needed -Sddu devtools
+if [[ "$DEVTOOLS_PKG" == https* ]]; then
+  pacman --noconfirm --needed -Udd "$DEVTOOLS_PKG"
+else
+  pacman --noconfirm --needed -Sddu "$DEVTOOLS_PKG"
+fi
 cp -v /usr/share/devtools/makepkg-x86_64.conf /mnt/etc/makepkg.conf
 __END__
     lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
