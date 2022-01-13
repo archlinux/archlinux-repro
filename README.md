@@ -18,3 +18,5 @@ Work in progress. Please read the code before using.
 * curl
 * gnupg
 * systemd
+* bsdtar
+* zstd
