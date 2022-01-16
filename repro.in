@@ -347,7 +347,7 @@ function cmd_check(){
     DEVTOOLS_PKG="devtools"
     if [[ -z "${BUILDTOOL}" ]] || [[ "${BUILDTOOL}" = makepkg ]]; then
       DEVTOOLS="devtools-20210202-3-any"
-      DEVTOOLS_PKG="$ARCHIVEURL/${BUILDTOOL:0:1}/${DEVTOOLS}.pkg.tar${pkg##*tar}"
+      DEVTOOLS_PKG="$ARCHIVEURL/d/devtools/${DEVTOOLS}.pkg.tar${pkg##*tar}"
     elif [[ "${BUILDTOOL}" = devtools ]] ; then
       DEVTOOLS="${BUILDTOOL}-${BUILDTOOLVER}"
       DEVTOOLS_PKG="$ARCHIVEURL/${BUILDTOOL:0:1}/${DEVTOOLS}.pkg.tar${pkg##*tar}"
@@ -482,6 +482,7 @@ rm --recursive /etc/pacman.d/gnupg/
 cp --target-directory=/etc/pacman.d/ --recursive /gnupg
 echo "faked-system-time ${SOURCE_DATE_EPOCH}" >> /etc/pacman.d/gnupg/gpg.conf
 pacstrap -G -U /mnt --needed "\$@"
+echo "Installing devtools from $DEVTOOLS_PKG"
 # Ignore all dependencies since we only want the file
 # Saves us a few seconds and doesn't download a bunch of things
 # we are getting rid off
