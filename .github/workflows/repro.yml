@@ -1,0 +1,35 @@
+name: archlinux-repro
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg:
+        - archlinux-repro
+        - which
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: sudo apt update && sudo apt install -y asciidoc systemd-container
+
+    - name: Install archlinux-repro
+      run: sudo make install
+
+    - name: Fetch pkg
+      run: docker run --rm -v $PWD/pkg:/var/cache/pacman/pkg archlinux pacman -Syw ${{ matrix.pkg }} --noconfirm
+
+    - name: Remove signatures
+      run: sudo rm ./pkg/*.sig
+
+    - name: Test repro
+      run: repro ./pkg/${{ matrix.pkg }}-*
