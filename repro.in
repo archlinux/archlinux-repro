@@ -381,7 +381,10 @@ function cmd_check(){
     bash <<-__END__
 shopt -s globstar
 pacman -S asp --noconfirm --needed
-asp checkout $pkgbase
+if ! asp checkout $pkgbase; then
+    echo "ERROR: Failed checkout $pkgbase" >&2
+    exit 1
+fi
 pushd $pkgbase
 for rev in \$(git rev-list --all -- repos/); do
     pkgbuild_checksum=\$(git show \$rev:trunk/PKGBUILD | sha256sum -b)
