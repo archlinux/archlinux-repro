@@ -8,6 +8,9 @@ if ((DEBUG)); then
   set -x
 fi
 
+# Ensure umask is set correctly
+umask 022
+
 BUILDDIRECTORY=/var/lib/repro
 
 KEYRINGCACHE="${BUILDDIRECTORY}/keyring"
