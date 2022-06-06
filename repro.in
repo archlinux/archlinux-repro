@@ -15,8 +15,9 @@ BUILDDIRECTORY=/var/lib/repro
 
 KEYRINGCACHE="${BUILDDIRECTORY}/keyring"
 
-BOOTSTRAPMIRROR="https://europe.mirror.pkgbuild.com/iso/latest"
-readonly bootstrap_img=archlinux-bootstrap-"$(date +%Y.%m)".01-"$(uname -m)".tar.gz
+IMG_RELEASE_TIMESTAMP="$(date -d '24 hours ago' -u +%Y.%m)".01
+BOOTSTRAPMIRROR="https://europe.mirror.pkgbuild.com/iso/$IMG_RELEASE_TIMESTAMP"
+readonly bootstrap_img=archlinux-bootstrap-"$IMG_RELEASE_TIMESTAMP"-"$(uname -m)".tar.gz
 CONFIGDIR='REPRO_CONFIG_DIR'
 
 HOSTMIRROR="https://europe.mirror.pkgbuild.com/\$repo/os/\$arch"
