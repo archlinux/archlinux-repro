@@ -8,6 +8,9 @@ if ((DEBUG)); then
   set -x
 fi
 
+# Ensure umask is set correctly
+umask 022
+
 BUILDDIRECTORY=/var/lib/repro
 
 KEYRINGCACHE="${BUILDDIRECTORY}/keyring"
@@ -347,7 +350,7 @@ function cmd_check(){
     DEVTOOLS_PKG="devtools"
     if [[ -z "${BUILDTOOL}" ]] || [[ "${BUILDTOOL}" = makepkg ]]; then
       DEVTOOLS="devtools-20210202-3-any"
-      DEVTOOLS_PKG="$ARCHIVEURL/d/devtools/${DEVTOOLS}.pkg.tar${pkg##*tar}"
+      DEVTOOLS_PKG="$ARCHIVEURL/d/devtools/${DEVTOOLS}.pkg.tar.zst"
     elif [[ "${BUILDTOOL}" = devtools ]] ; then
       DEVTOOLS="${BUILDTOOL}-${BUILDTOOLVER}"
       DEVTOOLS_PKG="$ARCHIVEURL/${BUILDTOOL:0:1}/${DEVTOOLS}.pkg.tar${pkg##*tar}"
@@ -381,7 +384,10 @@ function cmd_check(){
     bash <<-__END__
 shopt -s globstar
 pacman -S asp --noconfirm --needed
-asp checkout $pkgbase
+if ! asp checkout $pkgbase; then
+    echo "ERROR: Failed checkout $pkgbase" >&2
+    exit 1
+fi
 pushd $pkgbase
 for rev in \$(git rev-list --all -- repos/); do
     pkgbuild_checksum=\$(git show \$rev:trunk/PKGBUILD | sha256sum -b)
