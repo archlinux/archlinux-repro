@@ -433,7 +433,7 @@ __END__
       # shellcheck disable=SC2086
       keyring=$(printf -- '%s\n' ${packages[*]} | grep -E "archlinux-keyring")
       EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}:/mnt" --bind="$(readlink -e "${cachedir}"):/cache" bash -c \
-          'pacstrap -U /mnt "$@"' -bash "${keyring}" &>/dev/null
+          'pacstrap -U /mnt -dd "$@"' -bash "${keyring}" &>/dev/null
 
       mkdir -p "$KEYRINGCACHE/$keyring_package"
       trap "{ rm -rf $KEYRINGCACHE/$keyring_package ; exit 1; }" ERR INT
