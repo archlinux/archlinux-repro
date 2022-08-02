@@ -312,7 +312,8 @@ function init_chroot(){
     if nlock 9 "$BUILDDIRECTORY"/root.lock; then
       msg "Updating container"
       printf 'Server = %s\n' "$HOSTMIRROR" > "$BUILDDIRECTORY"/root/etc/pacman.d/mirrorlist
-      exec_nspawn root pacman -Syu --noconfirm
+      exec_nspawn root pacman -Sy --noconfirm --needed archlinux-keyring
+      exec_nspawn root pacman -Su --noconfirm
       lock_close 9
     else
       msg "Couldn't acquire container lock, didn't update."
