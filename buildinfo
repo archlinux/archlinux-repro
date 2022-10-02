@@ -118,6 +118,7 @@ function download_archive_package () {
 					echo "check ${workdir}" >&2
 					exit 1
 				fi
+				break
 			fi
 		done
 		cd "${pwd}" || exit 1
