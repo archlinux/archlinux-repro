@@ -22,7 +22,8 @@ repro: repro.in
 
 .PHONY: install
 install: repro man
-	install -Dm755 repro -t $(DESTDIR)$(BINDIR)
+	install -Dm755 repro $(DESTDIR)$(BINDIR)/$(PROGNM)
+	ln -s $(PROGNM) $(DESTDIR)$(BINDIR)/repro
 	install -Dm755 buildinfo -t $(DESTDIR)$(BINDIR)
 	install -Dm644 examples/*   -t $(DESTDIR)$(DOCDIR)/$(PROGNM)
 	for manfile in $(MANS); do \
