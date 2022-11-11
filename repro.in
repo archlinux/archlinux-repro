@@ -71,7 +71,8 @@ function gpg() {
 }
 
 function init_gnupg() {
-    mkdir -p "$BUILDDIRECTORY/_gnupg"
+    mkdir -p "$BUILDDIRECTORY/"
+    mkdir -p --mode 700 "$BUILDDIRECTORY/_gnupg"
 
     # ensure signing key is available
     # We try WKD first, then fallback to keyservers.
