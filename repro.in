@@ -334,9 +334,7 @@ function cmd_check(){
     done <<< "$(buildinfo -ff "${pkg}")"
     packager="${buildinfo[packager]}"
     builddir="${buildinfo[builddir]}"
-    _pkgver="${buildinfo[pkgver]}"
-    pkgrel=${_pkgver##*-}
-    pkgver=${_pkgver%-*}
+    pkgver="${buildinfo[pkgver]}"
     pkgbase=${buildinfo[pkgbase]}
     options=${buildinfo[options]}
     buildenv=${buildinfo[buildenv]}
@@ -377,7 +375,7 @@ function cmd_check(){
 
     # Father I have sinned
     if ((!pkgbuild_file)); then
-    msg2 "Fetching PKGBUILD from ASP..."
+    msg2 "Fetching PKGBUILD from git..."
 
     # Lock the cachedir as we might have a race condition with pacman -S and the cachedir
     lock 9 "${cachedir}.lock"
@@ -385,23 +383,20 @@ function cmd_check(){
     EPHEMERAL=1 exec_nspawn root --bind="${build_root_dir}/startdir:/startdir" --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
     bash <<-__END__
 shopt -s globstar
-pacman -S asp --noconfirm --needed
-if ! asp checkout $pkgbase; then
+
+pacman -S devtools --noconfirm --needed
+
+if ! pkgctl repo clone --protocol https --switch "$pkgver" "$pkgbase"; then
     echo "ERROR: Failed checkout $pkgbase" >&2
     exit 1
 fi
-pushd $pkgbase
-for rev in \$(git rev-list --all -- repos/); do
-    pkgbuild_checksum=\$(git show \$rev:trunk/PKGBUILD | sha256sum -b)
-    pkgbuild_checksum=\${pkgbuild_checksum%% *}
-    if [ \$pkgbuild_checksum = $pkgbuild_sha256sum ]; then
-        git checkout \$rev
-        mv ./trunk/* /startdir
-        exit 0
-    fi
-done
-echo "ERROR: Failed to find commit this was built with (PKGBUILD checksum didn't match any commit)" >&2
-exit 1
+
+if ! echo "$pkgbuild_sha256sum  $pkgbase/PKGBUILD" | sha256sum -c; then
+    echo "ERROR: Failed to find commit this was built with (PKGBUILD checksum didn't match)" >&2
+    exit 1
+fi
+
+mv ./$pkgbase/* /startdir
 __END__
     lock_close 9 "${cachedir}.lock"
   elif [[ -r "PKGBUILD" ]]; then
@@ -490,6 +485,7 @@ rm --recursive /etc/pacman.d/gnupg/
 cp --target-directory=/etc/pacman.d/ --recursive /gnupg
 echo "faked-system-time ${SOURCE_DATE_EPOCH}" >> /etc/pacman.d/gnupg/gpg.conf
 pacstrap -G -U /mnt --needed "\$@"
+
 echo "Installing devtools from $DEVTOOLS_PKG"
 # Ignore all dependencies since we only want the file
 # Saves us a few seconds and doesn't download a bunch of things
@@ -499,7 +495,12 @@ if [[ "$DEVTOOLS_PKG" == https* ]]; then
 else
   pacman --noconfirm --needed -Sddu "$DEVTOOLS_PKG"
 fi
-cp -v /usr/share/devtools/makepkg-x86_64.conf /mnt/etc/makepkg.conf
+
+for makepkg_path in /usr/share/devtools/{makepkg-x86_64.conf,makepkg.d/x86_64.conf}; do
+  if [ -f "\$makepkg_path" ]; then
+    cp -v "\$makepkg_path" /mnt/etc/makepkg.conf
+  fi
+done
 __END__
     lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
 
