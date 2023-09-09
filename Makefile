@@ -22,7 +22,8 @@ repro: repro.in
 
 .PHONY: install
 install: repro man
-	install -Dm755 repro -t $(DESTDIR)$(BINDIR)
+	install -Dm755 repro $(DESTDIR)$(BINDIR)/$(PROGNM)
+	ln -s $(PROGNM) $(DESTDIR)$(BINDIR)/repro
 	install -Dm755 buildinfo -t $(DESTDIR)$(BINDIR)
 	install -Dm644 examples/*   -t $(DESTDIR)$(DOCDIR)/$(PROGNM)
 	for manfile in $(MANS); do \
@@ -52,6 +53,6 @@ tag:
 .PHONY: release
 release:
 	mkdir -p releases
-	git archive --prefix=${PROGNM}-${TAG}/ -o releases/${PROGNM}-${TAG}.tar.gz ${TAG};
+	git -c tar.tar.gz.command='gzip -cn' archive --prefix=${PROGNM}-${TAG}/ -o releases/${PROGNM}-${TAG}.tar.gz ${TAG}
 	gpg --detach-sign -o releases/${PROGNM}-${TAG}.tar.gz.sig releases/${PROGNM}-${TAG}.tar.gz
 	hub release create -m "Release: ${TAG}" -a releases/${PROGNM}-${TAG}.tar.gz.sig -a releases/${PROGNM}-${TAG}.tar.gz ${TAG}
