@@ -496,11 +496,14 @@ else
   pacman --noconfirm --needed -Sddu "$DEVTOOLS_PKG"
 fi
 
-for makepkg_path in /usr/share/devtools/{makepkg-x86_64.conf,makepkg.d/x86_64.conf}; do
-  if [ -f "\$makepkg_path" ]; then
-    cp -v "\$makepkg_path" /mnt/etc/makepkg.conf
-  fi
-done
+if [[ -f /usr/share/devtools/makepkg.conf.d/x86_64.conf ]]; then
+    cp -v /usr/share/devtools/makepkg.conf.d/x86_64.conf /mnt/etc/makepkg.conf
+elif [[ -f /usr/share/devtools/makepkg-x86_64.conf ]]; then
+    cp -v /usr/share/devtools/makepkg-x86_64.conf /mnt/etc/makepkg.conf
+else
+    echo "Failed to find the makepkg.conf location, please report to archlinux-repro"
+    exit 1
+fi
 __END__
     lock_close 9 "$KEYRINGCACHE/$keyring_package.lock"
 
