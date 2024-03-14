@@ -481,6 +481,7 @@ __END__
       --bind="$(readlink -e ${cachedir}):/var/cache/pacman/pkg" \
       --bind="$(readlink -e ${cachedir}):/cache" \
       bash -bash "${packages[@]}" <<-__END__
+set -e
 rm --recursive /etc/pacman.d/gnupg/
 cp --target-directory=/etc/pacman.d/ --recursive /gnupg
 echo "faked-system-time ${SOURCE_DATE_EPOCH}" >> /etc/pacman.d/gnupg/gpg.conf
