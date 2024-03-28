@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 # shellcheck disable=SC2155
 
 # Copyright (c) 2018 Robin Broda <robin@broda.me>
