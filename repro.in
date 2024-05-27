@@ -16,7 +16,7 @@ BUILDDIRECTORY=/var/lib/repro
 KEYRINGCACHE="${BUILDDIRECTORY}/keyring"
 
 BOOTSTRAPMIRROR="https://geo.mirror.pkgbuild.com/iso/latest"
-readonly bootstrap_img=archlinux-bootstrap-"$(uname -m)".tar.gz
+BOOTSTRAP_IMG=archlinux-bootstrap-"$(uname -m)".tar
 CONFIGDIR='REPRO_CONFIG_DIR'
 
 HOSTMIRROR="https://geo.mirror.pkgbuild.com/\$repo/os/\$arch"
@@ -283,7 +283,21 @@ function init_chroot(){
     # - with empty directory in the follow-up lock - if using test/mkdir/lock
     lock 9 "$BUILDDIRECTORY"/root.lock
     if [ ! -d "$BUILDDIRECTORY"/root ]; then
-        get_bootstrap_img
+        init_gnupg
+
+        if ! compgen -G "$IMGDIRECTORY/$bootstrap_img"* > /dev/null; then
+            msg "Downloading bootstrap image..."
+
+            for ext in zst gz; do
+                bootstrap_img="$BOOTSTRAP_IMG.$ext"
+                ( cd "$IMGDIRECTORY" && curl -f --remote-name-all "$BOOTSTRAPMIRROR/$bootstrap_img"{,.sig} )
+                if ! gpg --verify "$IMGDIRECTORY/$bootstrap_img.sig" "$IMGDIRECTORY/$bootstrap_img"; then
+                    error "Can't verify image"
+                    exit 1
+                fi
+                break
+            done 
+        fi
 
         msg "Preparing chroot"
         trap '{ cleanup_root_volume; exit 1; }' ERR
@@ -552,20 +566,6 @@ __END__
           PYTHONIOENCODING=utf-8 $DIFFOSCOPE "$pkg" "$OUTDIR/$(basename "$pkg")" || true
       fi
       exit 1
-    fi
-}
-
-# Desc: Fetches a bootstrap image and verifies the signature
-function get_bootstrap_img() {
-    init_gnupg
-
-    if [ ! -e "$IMGDIRECTORY/$bootstrap_img" ]; then
-        msg "Downloading bootstrap image..."
-        ( cd "$IMGDIRECTORY" && curl -f --remote-name-all "$BOOTSTRAPMIRROR/$bootstrap_img"{,.sig} )
-        if ! gpg --verify "$IMGDIRECTORY/$bootstrap_img.sig" "$IMGDIRECTORY/$bootstrap_img"; then
-            error "Can't verify image"
-            exit 1
-        fi
     fi
 }
 
