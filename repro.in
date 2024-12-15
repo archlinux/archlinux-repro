@@ -67,17 +67,19 @@ function check_root() {
 
 # Use a private gpg keyring
 function gpg() {
-  command gpg --homedir="$BUILDDIRECTORY/_gnupg" "$@"
+    command gpg --homedir="$BUILDDIRECTORY/_gnupg" "$@"
 }
 
 function init_gnupg() {
     mkdir -p "$BUILDDIRECTORY/"
     mkdir -p --mode 700 "$BUILDDIRECTORY/_gnupg"
 
-    # ensure signing key is available
-    # We try WKD first, then fallback to keyservers.
-    # This works on debian./
-    gpg --keyserver=p80.pool.sks-keyservers.net --auto-key-locate wkd,keyserver --locate-keys pierre@archlinux.org
+    # Ensure signing key is available
+    # This works on debian
+    KEYID=3E80CA1A8B89F69CBA57D98A76A5EF9054449A5C
+    if [ -z "$(gpg --export "$KEYID" 2>/dev/null)" ]; then
+        gpg --keyserver=keys.openpgp.org --recv-keys "$KEYID"
+    fi
 }
 
 # Desc: Sets the appropriate colors for output
