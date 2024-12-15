@@ -1,7 +1,7 @@
-repro
-=====
+archlinux-repro
+===============
 
-`repro` is intended to be a tool for users to verify packages distributed by Arch Linux.
+`archlinux-repro` is intended to be a tool for users to verify packages distributed by Arch Linux.
 
 The current goals are:
 - Recreate packages given a `.BUILDINFO` file, or `.pkg.tar.xz`
