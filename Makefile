@@ -55,4 +55,4 @@ release:
 	mkdir -p releases
 	git -c tar.tar.gz.command='gzip -cn' archive --prefix=${PROGNM}-${TAG}/ -o releases/${PROGNM}-${TAG}.tar.gz ${TAG}
 	gpg --detach-sign -o releases/${PROGNM}-${TAG}.tar.gz.sig releases/${PROGNM}-${TAG}.tar.gz
-	hub release create -m "Release: ${TAG}" -a releases/${PROGNM}-${TAG}.tar.gz.sig -a releases/${PROGNM}-${TAG}.tar.gz ${TAG}
+	gh release create -t "Release: ${TAG}" ${TAG} releases/${PROGNM}-${TAG}.tar.gz.sig releases/${PROGNM}-${TAG}.tar.gz
