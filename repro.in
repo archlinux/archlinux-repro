@@ -77,7 +77,7 @@ function init_gnupg() {
     # Ensure signing key is available
     # This works on debian
     KEYID=3E80CA1A8B89F69CBA57D98A76A5EF9054449A5C
-    if [ -z "$(gpg --export "$KEYID" 2>/dev/null)" ]; then
+    if [ -z "$(gpg --armor --export "$KEYID" 2>/dev/null)" ]; then
         gpg --keyserver=keys.openpgp.org --recv-keys "$KEYID"
     fi
 }
