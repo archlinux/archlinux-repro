@@ -370,7 +370,7 @@ function cmd_check(){
       DEVTOOLS_PKG="$ARCHIVEURL/d/devtools/${DEVTOOLS}.pkg.tar.zst"
     elif [[ "${BUILDTOOL}" = devtools ]] ; then
       DEVTOOLS="${BUILDTOOL}-${BUILDTOOLVER}"
-      DEVTOOLS_PKG="$ARCHIVEURL/${BUILDTOOL:0:1}/${DEVTOOLS}.pkg.tar${pkg##*tar}"
+      DEVTOOLS_PKG="$ARCHIVEURL/${BUILDTOOL:0:1}/${BUILDTOOL}/${DEVTOOLS}.pkg.tar${pkg##*tar}"
     fi
     msg2 "Using devtools version: %s" "${DEVTOOLS}"
 
