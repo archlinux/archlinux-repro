@@ -246,7 +246,6 @@ function remove_snapshot (){
 # 1: name of container
 function create_snapshot (){
     local build="$1"
-    trap "{ remove_snapshot \"$build\" ; exit 1; }" ERR INT
     msg2 "Create snapshot for $build..."
     mkdir -p "${BUILDDIRECTORY}/${build}/startdir"
     touch "$BUILDDIRECTORY/$build"
@@ -387,6 +386,7 @@ function cmd_check(){
     msg "Starting build..."
     local build="${pkgbase}_$$"
     create_snapshot "$build" 0
+    trap "{ remove_snapshot \"$build\" ; exit 1; }" ERR INT
 
     local build_root_dir="$BUILDDIRECTORY/${build}"
 
