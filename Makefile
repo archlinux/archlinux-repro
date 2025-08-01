@@ -53,6 +53,6 @@ tag:
 .PHONY: release
 release:
 	mkdir -p releases
-	git archive --format=tar.gz --prefix=${PROGNM}-${TAG}/ -o releases/${PROGNM}-${TAG}.tar.gz ${TAG}
+	git archive --format=tar.gz --prefix=${PROGNM}-${TAG}/ | gzip -cn > releases/${PROGNM}-${TAG}.tar.gz ${TAG}
 	gpg --detach-sign -o releases/${PROGNM}-${TAG}.tar.gz.sig releases/${PROGNM}-${TAG}.tar.gz
 	gh release create -t "Release: ${TAG}" ${TAG} releases/${PROGNM}-${TAG}.tar.gz.sig releases/${PROGNM}-${TAG}.tar.gz
