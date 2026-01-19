@@ -220,6 +220,7 @@ function exec_nspawn(){
         ${EPHEMERAL:+--ephemeral} \
         ${ISSYSTEMD242:+--pipe} \
         ${MAX_MEMORY:+--property="MemoryMax=${MAX_MEMORY}"} \
+        ${MAX_CPU:+--property="CPUQuota=${MAX_CPU}"} \
         -E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
         -D "$BUILDDIRECTORY/$container" "${@:2}"
     if ((EPHEMERAL)); then
@@ -583,6 +584,7 @@ General Options:
  -d                           Run diffoscope if packages are not reproducible
  -f                           Use the local PKGBUILD for building
  -n                           Run makepkg with --nocheck
+ -C <value>                   Set a CPU quota for the build container (e.g. 500% for 5 cores)
  -M <value>                   Set an upper limit for RAM use on the build container (e.g. 12G)
  -V                           Print version information
  -o <path>                    Set the output directory (default: ./build)
@@ -594,13 +596,14 @@ function print_version() {
 }
 
 function parse_args() {
-    while getopts :hdnfM:Vo: arg; do
+    while getopts :hdnfC:M:Vo: arg; do
         case $arg in
             h) print_help; exit 0;;
             V) print_version; exit 0;;
             f) pkgbuild_file=1;;
             d) run_diffoscope=1;;
             n) NOCHECK=1;;
+            C) MAX_CPU="$OPTARG";;
             M) MAX_MEMORY="$OPTARG";;
             o) OUTDIR="$OPTARG";;
             *) error "unknown argument ${OPTARG}" ; print_help; exit 1;;
